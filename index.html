@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>СВОЯ AI — Operator</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:#0b1020;color:#eef2ff}
+.wrap{max-width:1000px;margin:0 auto;padding:48px 20px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}
+h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;border:1px solid #33405f;border-radius:999px;font-size:13px}
+.card{margin-top:28px;background:#11182b;border:1px solid #26324d;border-radius:18px;padding:22px}
+textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
+button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer}
+.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}
+@media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.3 • Operator skeleton</div></div>
+<section class="card">
+<div class="muted">Команда</div>
+<textarea id="task">Найди актуальную информацию по теме и сравни несколько источников.</textarea>
+<button id="run">Запустить</button>
+<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div>
+<div class="steps">
+<div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Определить риск</div><div class="step"><div class="num">03</div>Выбрать инструмент</div>
+<div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
+</div>
+<div class="risk"><b>Risk Gate:</b> <span id="risk">LOW — demo task</span></div>
+<div class="result" id="result"></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+$("run").onclick=async()=>{
+ const stages=["Понимаю задачу…","Проверяю риск…","Выбираю инструмент…","Выполняю…","Проверяю результат…","Формирую ответ…"];
+ $("run").disabled=true;$("result").textContent="";
+ for(const s of stages){$("status").textContent=s;await new Promise(r=>setTimeout(r,350))}
+ $("status").textContent="Готово";
+ $("result").textContent="PASS\n\nСейчас это демонстрационный цикл V0.3. Реальные LLM, Web Research, Laya, память и верификатор будут подключены на следующих этапах.";
+ $("run").disabled=false;
+};
+</script>
+</body>
+</html>
