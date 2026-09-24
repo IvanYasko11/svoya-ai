@@ -18,17 +18,17 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </head>
 <body>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.5 • Verification</div></div>
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.7 • Security</div></div>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task">Объясни простыми словами, что такое AI-агент.</textarea>
 <button id="run">Запустить</button>
 <div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div>
 <div class="steps">
-<div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Определить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
+<div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
 </div>
-<div class="risk"><b>Risk Gate:</b> <span id="risk">LOW — text generation</span></div>
+<div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span></div>
 <div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
 <div class="result" id="result"></div>
 </section>
@@ -42,7 +42,8 @@ function verifyResponse(data, task){
     ["Ответ существует",answer.length>0],
     ["Провайдер указан",typeof data?.provider==="string"&&data.provider.length>0],
     ["Модель указана",typeof data?.model==="string"&&data.model.length>0],
-    ["Запрос не пустой",task.trim().length>0]
+    ["Запрос не пустой",task.trim().length>0],
+    ["Risk Gate LOW",data?.risk_level==="LOW"&&data?.requires_confirmation===false]
   ];
   const passed=checks.filter(x=>x[1]).length;
   return {ok:passed===checks.length,summary:`${passed}/${checks.length} технических проверок пройдено`};
@@ -51,24 +52,37 @@ function verifyResponse(data, task){
 $("run").onclick=async()=>{
  const task=$("task").value.trim();
  if(!task){$("result").textContent="Введите команду.";return}
- const stages=["Понимаю задачу…","Проверяю риск…","Выбираю LLM…","Отправляю запрос…","Получаю и проверяю ответ…","Формирую ответ…"];
- $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";
+ const stages=["Понимаю задачу…","Проверяю риск на сервере…","Выбираю LLM…","Отправляю запрос…","Получаю и проверяю ответ…","Формирую ответ…"];
+ $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";
  try{
-   for(const s of stages.slice(0,3)){ $("status").textContent=s; await new Promise(r=>setTimeout(r,250)); }
-   $("status").textContent=stages[3];
+   $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
+   $("status").textContent=stages[1];
    const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task})});
    const data=await response.json();
-   if(!response.ok) throw new Error(data.error||"Ошибка API");
+
+   if(data?.risk_level){
+     $("risk").textContent=data.risk_level+(data.requires_confirmation?" — требуется подтверждение":" — разрешено");
+   }
+
+   if(!response.ok){
+     $("verify").textContent=data?.requires_confirmation?"BLOCK — Risk Gate":"FAIL";
+     $("status").textContent=data?.requires_confirmation?"Остановлено Risk Gate":"Нужна настройка";
+     $("result").textContent=(data?.requires_confirmation?"ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ\n\n":"НЕ ГОТОВО\n\n")+(data?.error||"Ошибка API");
+     return;
+   }
+
+   $("status").textContent=stages[2]; await new Promise(r=>setTimeout(r,250));
+   $("status").textContent=stages[3];
    $("status").textContent=stages[4];
    const verification=verifyResponse(data,task);
-   $("verify").textContent=verification.ok?"PASS — "+verification.summary:"FAIL — "+verification.summary;
+   $("verify").textContent=verification.ok?"TECHNICAL PASS — "+verification.summary:"TECHNICAL FAIL — "+verification.summary;
    if(!verification.ok) throw new Error("Ответ не прошёл техническую проверку.");
    await new Promise(r=>setTimeout(r,200));
    $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
    $("result").textContent="PASS\n\n"+data.answer+"\n\nПровайдер: "+data.provider+"\nМодель: "+data.model;
  }catch(e){
-   $("status").textContent="Нужна настройка";
+   $("status").textContent="Ошибка";
    $("verify").textContent="FAIL";
    $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
  }finally{$("run").disabled=false}
