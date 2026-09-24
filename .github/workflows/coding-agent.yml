@@ -157,6 +157,12 @@ jobs:
           unset OPENROUTER_API_KEY
           opencode run --standalone --model "svoya-agent/agent" --format default "$CODING_TASK"
 
+      - name: Inject deterministic Repair Loop self-test fault
+        if: steps.task.outputs.self_test == 'true'
+        run: |
+          printf '%s\n' 'SVOYA_REPAIR_LOOP_BROKEN' > REPAIR_LOOP_TEST.md
+          echo "Self-test fault injected intentionally; Semantic Verifier must reject it and Repair Agent must restore the required content."
+
       - name: Verify changes
         id: verify
         run: |
