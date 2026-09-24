@@ -29,6 +29,24 @@ function classifyRisk(task) {
   return { level: "LOW", requiresConfirmation: false };
 }
 
+function classifyIntent(task) {
+  const text = task.toLowerCase();
+
+  if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
+    return { intent: "CODING", route: "CODING_AGENT" };
+  }
+
+  if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
+    return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
+  }
+
+  if (/(сейчас|сегодня|последн|актуаль|новост|цена|курс|погода|интернет|исследуй|research)/i.test(text)) {
+    return { intent: "WEB_RESEARCH", route: "WEB_RESEARCH" };
+  }
+
+  return { intent: "GENERAL", route: "LLM" };
+}
+
 export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -58,6 +76,8 @@ export default async function handler(req, res) {
             : "Команда относится к действиям среднего риска. Сначала требуется явное подтверждение перед выполнением."
       });
     }
+
+    const routing = classifyIntent(task);
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const openAIKey = process.env.OPENAI_API_KEY;
@@ -148,8 +168,10 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             user_request: task,
+            intent: routing.intent,
             language: "ru",
             risk_level: risk.level,
+            selected_tool: routing.route,
             provider: useOpenRouter ? "OpenRouter" : "OpenAI",
             model,
             answer: answer || "Модель не вернула текст.",
@@ -169,6 +191,8 @@ export default async function handler(req, res) {
       ok: true,
       risk_level: risk.level,
       requires_confirmation: risk.requiresConfirmation,
+      intent: routing.intent,
+      route: routing.route,
       provider: useOpenRouter ? "OpenRouter" : "OpenAI",
       model,
       answer: answer || "Модель не вернула текст."
