@@ -12,13 +12,13 @@ h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;bo
 textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
 button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}
 @media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
 </style>
 </head>
 <body>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.4 • Real LLM</div></div>
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.5 • Verification</div></div>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task">Объясни простыми словами, что такое AI-агент.</textarea>
@@ -29,28 +29,47 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
 </div>
 <div class="risk"><b>Risk Gate:</b> <span id="risk">LOW — text generation</span></div>
+<div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
 <div class="result" id="result"></div>
 </section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
+
+function verifyResponse(data, task){
+  const answer=typeof data?.answer==="string"?data.answer.trim():"";
+  const checks=[
+    ["Ответ существует",answer.length>0],
+    ["Провайдер указан",typeof data?.provider==="string"&&data.provider.length>0],
+    ["Модель указана",typeof data?.model==="string"&&data.model.length>0],
+    ["Запрос не пустой",task.trim().length>0]
+  ];
+  const passed=checks.filter(x=>x[1]).length;
+  return {ok:passed===checks.length,summary:`${passed}/${checks.length} технических проверок пройдено`};
+}
+
 $("run").onclick=async()=>{
  const task=$("task").value.trim();
  if(!task){$("result").textContent="Введите команду.";return}
  const stages=["Понимаю задачу…","Проверяю риск…","Выбираю LLM…","Отправляю запрос…","Получаю и проверяю ответ…","Формирую ответ…"];
- $("run").disabled=true;$("result").textContent="";
+ $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";
  try{
    for(const s of stages.slice(0,3)){ $("status").textContent=s; await new Promise(r=>setTimeout(r,250)); }
    $("status").textContent=stages[3];
    const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task})});
    const data=await response.json();
    if(!response.ok) throw new Error(data.error||"Ошибка API");
-   $("status").textContent=stages[4]; await new Promise(r=>setTimeout(r,200));
+   $("status").textContent=stages[4];
+   const verification=verifyResponse(data,task);
+   $("verify").textContent=verification.ok?"PASS — "+verification.summary:"FAIL — "+verification.summary;
+   if(!verification.ok) throw new Error("Ответ не прошёл техническую проверку.");
+   await new Promise(r=>setTimeout(r,200));
    $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
-   $("result").textContent="PASS\n\n"+data.answer+"\n\nМодель: "+data.model;
+   $("result").textContent="PASS\n\n"+data.answer+"\n\nПровайдер: "+data.provider+"\nМодель: "+data.model;
  }catch(e){
    $("status").textContent="Нужна настройка";
+   $("verify").textContent="FAIL";
    $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
  }finally{$("run").disabled=false}
 };
