@@ -79,6 +79,89 @@ export default async function handler(req, res) {
 
     const routing = classifyIntent(task);
 
+    if (routing.route === "CODING_AGENT") {
+      const githubToken = process.env.GITHUB_DISPATCH_TOKEN;
+
+      if (!githubToken) {
+        return res.status(503).json({
+          error: "Coding Agent не подключён: GITHUB_DISPATCH_TOKEN не настроен."
+        });
+      }
+
+      const codingModel = process.env.CODING_AGENT_MODEL || "cohere/north-mini-code:free";
+
+      const dispatchResponse = await fetch(
+        "https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${githubToken}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "Svoya-AI"
+          },
+          body: JSON.stringify({
+            event_type: "svoya-coding-task",
+            client_payload: {
+              task,
+              model: codingModel,
+              apply_changes: "false"
+            }
+          })
+        }
+      );
+
+      if (!dispatchResponse.ok) {
+        const raw = await dispatchResponse.text();
+        return res.status(dispatchResponse.status).json({
+          error: "GitHub не принял задачу Coding Agent.",
+          details: raw
+        });
+      }
+
+      const answer = "Coding Agent подключён. Задача принята и поставлена в очередь GitHub Actions. Изменения в репозиторий не применяются без отдельного подтверждения.";
+
+      const dbKey = process.env["SUPABASE_SECRET_KEY"];
+      if (dbKey) {
+        try {
+          await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+            method: "POST",
+            headers: {
+              apikey: dbKey,
+              Authorization: "Bearer " + dbKey,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify({
+              user_request: task,
+              intent: routing.intent,
+              language: "ru",
+              risk_level: risk.level,
+              selected_tool: routing.route,
+              provider: "GitHub Actions + OpenCode",
+              model: codingModel,
+              answer,
+              verification_status: "queued"
+            })
+          });
+        } catch (memoryError) {
+          console.error("Database save failed:", memoryError?.message || memoryError);
+        }
+      }
+
+      return res.status(202).json({
+        ok: true,
+        risk_level: risk.level,
+        requires_confirmation: false,
+        intent: routing.intent,
+        route: routing.route,
+        provider: "GitHub Actions + OpenCode",
+        model: codingModel,
+        answer
+      });
+    }
+
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const openAIKey = process.env.OPENAI_API_KEY;
 
