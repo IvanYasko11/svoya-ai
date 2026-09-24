@@ -1,4 +1,38 @@
+function classifyRisk(task) {
+  const text = task.toLowerCase();
+
+  const highRiskPatterns = [
+    /\b(парол|password|api[-_ ]?key|секрет|secret|токен|token)\b/i,
+    /\b(оплат|плат[еи]|перевод|покупк|payment|purchase)\b/i,
+    /\b(удал[иь]|delete|стереть|уничтож)\b/i,
+    /\b(опубликов|publish|размести|выложи)\b/i,
+    /\b(войти|логин|login|авториз|sign[ -]?in)\b/i
+  ];
+
+  const mediumRiskPatterns = [
+    /\b(отправ[ьи]|send|сообщен|email|почт|письм)\b/i,
+    /\b(измен[ьи]|modify|обнов[ьи]|update)\b/i,
+    /\b(создай.*файл|измен[ьи].*файл|файл.*измен)\b/i,
+    /\b(запусти|execute|выполн)\b/i,
+    /\b(броузер|browser|сайт|website)\b/i
+  ];
+
+  if (highRiskPatterns.some((pattern) => pattern.test(text))) {
+    return { level: "HIGH", requiresConfirmation: true };
+  }
+
+  if (mediumRiskPatterns.some((pattern) => pattern.test(text))) {
+    return { level: "MEDIUM", requiresConfirmation: true };
+  }
+
+  return { level: "LOW", requiresConfirmation: false };
+}
+
 export default async function handler(req, res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -9,6 +43,20 @@ export default async function handler(req, res) {
 
     if (!task) return res.status(400).json({ error: "Пустая команда." });
     if (task.length > 12000) return res.status(400).json({ error: "Команда слишком длинная." });
+
+    const risk = classifyRisk(task);
+
+    if (risk.requiresConfirmation) {
+      return res.status(409).json({
+        ok: false,
+        risk_level: risk.level,
+        requires_confirmation: true,
+        error:
+          risk.level === "HIGH"
+            ? "Команда относится к действиям высокого риска. Сначала требуется явное подтверждение непосредственно перед выполнением."
+            : "Команда относится к действиям среднего риска. Сначала требуется явное подтверждение перед выполнением."
+      });
+    }
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const openAIKey = process.env.OPENAI_API_KEY;
@@ -89,7 +137,7 @@ export default async function handler(req, res) {
     const dbKey = process.env["SUPABASE_SECRET_KEY"];
     if (dbKey) {
       try {
-        await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+        const memoryResponse = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
           method: "POST",
           headers: {
             apikey: dbKey,
@@ -100,13 +148,17 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             user_request: task,
             language: "ru",
-            risk_level: "LOW",
+            risk_level: risk.level,
             provider: useOpenRouter ? "OpenRouter" : "OpenAI",
             model,
             answer: answer || "Модель не вернула текст.",
             verification_status: "pending"
           })
         });
+
+        if (!memoryResponse.ok) {
+          console.error("Database save failed:", await memoryResponse.text());
+        }
       } catch (memoryError) {
         console.error("Database save failed:", memoryError?.message || memoryError);
       }
@@ -114,6 +166,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+      risk_level: risk.level,
+      requires_confirmation: risk.requiresConfirmation,
       provider: useOpenRouter ? "OpenRouter" : "OpenAI",
       model,
       answer: answer || "Модель не вернула текст."
