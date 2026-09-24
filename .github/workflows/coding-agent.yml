@@ -91,11 +91,49 @@ jobs:
             exit 1
           fi
 
-          opencode run \
-            --standalone \
-            --model "openrouter/$CODING_MODEL" \
-            --format default \
-            "$CODING_TASK"
+          cat > /tmp/svoya-broker.mjs <<'NODE'
+          const http = require("http");
+          const key = process.env.OPENROUTER_API_KEY;
+          const server = http.createServer(async (req, res) => {
+            if (req.method === "GET" && req.url === "/v1/models") {
+              res.writeHead(200, {"Content-Type":"application/json"});
+              res.end(JSON.stringify({object:"list",data:[{id:"agent",object:"model",owned_by:"svoya-ai"}]}));
+              return;
+            }
+            if (req.method !== "POST" || req.url !== "/v1/chat/completions") { res.writeHead(404); res.end(); return; }
+            let body = "";
+            req.setEncoding("utf8");
+            req.on("data", chunk => body += chunk);
+            req.on("end", async () => {
+              try {
+                const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                  method:"POST",
+                  headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://svoya-ai.vercel.app","X-Title":"Svoya AI Agent Broker"},
+                  body
+                });
+                const out = await upstream.text();
+                res.writeHead(upstream.status, {"Content-Type":upstream.headers.get("content-type") || "application/json"});
+                res.end(out);
+              } catch { res.writeHead(502, {"Content-Type":"application/json"}); res.end(JSON.stringify({error:{message:"LLM broker failure"}})); }
+            });
+          });
+          server.listen(8786, "127.0.0.1");
+          NODE
+
+          node /tmp/svoya-broker.mjs &
+          BROKER_PID=$!
+          trap 'kill "$BROKER_PID" 2>/dev/null || true; rm -f /tmp/svoya-broker.mjs' EXIT
+          sleep 1
+
+          export OPENCODE_CONFIG_CONTENT="$(node -e 'process.stdout.write(JSON.stringify({" +
+            "'$schema'":"https://opencode.ai/config.json",model:"svoya-agent/agent",providers:{" +
+            "'svoya-agent'":{name:"Svoya AI Agent Broker",package:"@opencode/ai/providers/openai-compatible",settings:{baseURL:"http://127.0.0.1:8786/v1",apiKey:"broker-local-only"},models:{agent:{name:process.env.CODING_MODEL,modelID:process.env.CODING_MODEL}}}," +
+            experimental:{policies:[" +
+              {action:"permission",resource:"shell:git push *",effect:"deny"},{action:"permission",resource:"shell:curl *",effect:"deny"},{action:"permission",resource:"shell:wget *",effect:"deny"},{action:"permission",resource:"shell:ssh *",effect:"deny"},{action:"permission",resource:"shell:scp *",effect:"deny"},{action:"permission",resource:"shell:nc *",effect:"deny"},{action:"permission",resource:"shell:env",effect:"deny"},{action:"permission",resource:"shell:printenv *",effect:"deny"},{action:"permission",resource:"read:*.env",effect:"deny"},{action:"permission",resource:"read:*.env.*",effect:"deny"}" +
+            ]}}))')"
+
+          unset OPENROUTER_API_KEY
+          opencode run --standalone --model "svoya-agent/agent" --format default "$CODING_TASK"
 
       - name: Verify changes
         id: verify
