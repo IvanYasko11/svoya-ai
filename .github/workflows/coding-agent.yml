@@ -20,6 +20,11 @@ on:
         required: false
         default: "false"
         type: string
+      self_test:
+        description: "Run deterministic Repair Loop self-test"
+        required: false
+        default: "false"
+        type: string
   repository_dispatch:
     types: [svoya-coding-task]
 
@@ -48,11 +53,18 @@ jobs:
           INPUT_TASK: ${{ inputs.task }}
           INPUT_MODEL: ${{ inputs.model }}
           INPUT_APPLY: ${{ inputs.apply_changes }}
+          INPUT_SELF_TEST: ${{ inputs.self_test }}
           DISPATCH_TASK_ID: ${{ github.event.client_payload.task_id }}
         run: |
           TASK="${DISPATCH_TASK:-$INPUT_TASK}"
           MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
           APPLY="${DISPATCH_APPLY:-${INPUT_APPLY:-false}}"
+          SELF_TEST="${INPUT_SELF_TEST:-false}"
+
+          if [ "$SELF_TEST" = "true" ]; then
+            TASK="Create REPAIR_LOOP_TEST.md with exactly one line: SVOYA_REPAIR_LOOP_OK"
+            APPLY="false"
+          fi
 
           if [ -z "$TASK" ]; then
             echo "::error::No coding task supplied."
@@ -64,6 +76,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "model=$MODEL" >> "$GITHUB_OUTPUT"
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
+          echo "self_test=$SELF_TEST" >> "$GITHUB_OUTPUT"
           TASK_ID="${DISPATCH_TASK_ID:-${{ github.run_id }}}"
           echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
 
