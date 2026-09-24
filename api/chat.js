@@ -1,5 +1,6 @@
 function classifyRisk(task) {
   const text = task.toLowerCase();
+  const normalizedText = text.replace(/[\s.,!?;:'"()\[\]{}<>_\-+=*\/\\]+/g, "");
 
   const highRiskPatterns = [
     /(парол|password|api[-_ ]?key|секрет|secret|токен|token)/i,
@@ -17,11 +18,11 @@ function classifyRisk(task) {
     /(броузер|browser|сайт|website)/i
   ];
 
-  if (highRiskPatterns.some((pattern) => pattern.test(text))) {
+  if (highRiskPatterns.some((pattern) => pattern.test(text) || pattern.test(normalizedText))) {
     return { level: "HIGH", requiresConfirmation: true };
   }
 
-  if (mediumRiskPatterns.some((pattern) => pattern.test(text))) {
+  if (mediumRiskPatterns.some((pattern) => pattern.test(text) || pattern.test(normalizedText))) {
     return { level: "MEDIUM", requiresConfirmation: true };
   }
 
