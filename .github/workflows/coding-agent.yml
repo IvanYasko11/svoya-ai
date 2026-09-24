@@ -12,6 +12,16 @@ on:
         required: false
         default: "cohere/north-mini-code:free"
         type: string
+      verify_file:
+        description: "Optional file path to verify"
+        required: false
+        default: ""
+        type: string
+      expected_content:
+        description: "Optional exact UTF-8 content expected in verify_file"
+        required: false
+        default: ""
+        type: string
 
 # TEST MODE: the agent may edit the temporary runner workspace,
 # but this workflow cannot push or modify the repository.
@@ -46,6 +56,43 @@ jobs:
 
           opencode run             --standalone             --model "openrouter/$CODING_MODEL"             --format default             "$CODING_TASK"
 
+      - name: Verify agent output
+        if: always()
+        env:
+          VERIFY_FILE: ${{ inputs.verify_file }}
+          EXPECTED_CONTENT: ${{ inputs.expected_content }}
+        run: |
+          if [ -z "$VERIFY_FILE" ]; then
+            echo "CODING AGENT VERIFIER: SKIP — no verify_file provided."
+            exit 0
+          fi
+
+          if [ ! -f "$VERIFY_FILE" ]; then
+            echo "::error::CODING AGENT VERIFIER: FAIL — expected file not found: $VERIFY_FILE"
+            exit 1
+          fi
+
+          if [ -n "$EXPECTED_CONTENT" ]; then
+            python - "$VERIFY_FILE" "$EXPECTED_CONTENT" <<'PY'
+          import sys
+          from pathlib import Path
+
+          file_path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          actual = file_path.read_text(encoding="utf-8")
+
+          if actual != expected:
+              print("::error::CODING AGENT VERIFIER: FAIL — file content does not exactly match expected content.")
+              print(f"Expected bytes: {len(expected.encode('utf-8'))}")
+              print(f"Actual bytes:   {len(actual.encode('utf-8'))}")
+              raise SystemExit(1)
+
+          print("CODING AGENT VERIFIER: PASS — file exists and exact content matches.")
+          PY
+          else
+            echo "CODING AGENT VERIFIER: PASS — file exists."
+          fi
+
       - name: Collect test results
         if: always()
         run: |
@@ -58,6 +105,11 @@ jobs:
             echo
             echo "=== Diff ==="
             git diff --binary
+            echo
+            if [ -n "${{ inputs.verify_file }}" ] && [ -f "${{ inputs.verify_file }}" ]; then
+              echo "=== Verified file content ==="
+              cat "${{ inputs.verify_file }}"
+            fi
           } > coding-agent-report.txt
 
           git diff --binary > coding-agent.patch
@@ -70,6 +122,7 @@ jobs:
           path: |
             coding-agent-report.txt
             coding-agent.patch
+            ${{ inputs.verify_file }}
 
       - name: Safety check
         if: always()
