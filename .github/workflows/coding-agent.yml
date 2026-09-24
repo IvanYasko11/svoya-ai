@@ -1,0 +1,63 @@
+name: SVoya AI Coding Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Coding task for the agent"
+        required: true
+        type: string
+      model:
+        description: "OpenRouter model"
+        required: false
+        default: "cohere/north-mini-code:free"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  coding-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install OpenCode
+        run: npm install --global opencode-ai
+
+      - name: Run OpenCode coding agent
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::error::GitHub secret OPENROUTER_API_KEY is not configured."
+            exit 1
+          fi
+
+          opencode run \
+            --model "openrouter/${{ inputs.model }}" \
+            --format default \
+            "${{ inputs.task }}"
+
+      - name: Show changed files
+        run: |
+          git status --short
+          git diff --stat
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No file changes produced by the coding agent."
+            exit 0
+          fi
+
+          git config user.name "SVoya AI Coding Agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: coding agent update"
+          git push
