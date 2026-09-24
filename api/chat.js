@@ -151,7 +151,10 @@ export default async function handler(req, res) {
       if (isCoding) {
         const taskId = crypto.randomUUID();
         approvalToken = await createApproval({ task, taskId, session, dbKey });
-        res.setHeader("Set-Cookie", "svoya_approval=" + encodeURIComponent(approvalToken) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600");
+        res.setHeader("Set-Cookie", [
+          "svoya_session=" + encodeURIComponent(session) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000",
+          "svoya_approval=" + encodeURIComponent(approvalToken) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600"
+        ]);
       }
 
       return res.status(409).json({
