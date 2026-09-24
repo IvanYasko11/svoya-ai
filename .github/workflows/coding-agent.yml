@@ -449,6 +449,13 @@ jobs:
           });
           NODE
 
+      - name: Deterministic self-test assertion
+        if: steps.task.outputs.self_test == 'true'
+        run: |
+          test -f REPAIR_LOOP_TEST.md
+          test "$(cat REPAIR_LOOP_TEST.md)" = "SVOYA_REPAIR_LOOP_OK"
+          echo "Repair Loop self-test assertion: PASS"
+
       - name: Create safe commit
         if: steps.verify.outputs.changed == 'true' && steps.task.outputs.apply == 'true'
         run: |
