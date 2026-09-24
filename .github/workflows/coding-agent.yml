@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   coding-agent:
@@ -124,6 +125,18 @@ jobs:
           git commit -m "feat(ai): apply coding agent task"
           git push --set-upstream origin "${{ steps.branch.outputs.branch }}"
 
+      - name: Create draft PR
+        id: pr
+        if: steps.verify.outputs.changed == 'true' && steps.task.outputs.apply == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          TASK_ID: ${{ steps.task.outputs.task_id }}
+        run: |
+          PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "AI: $TASK_ID" --body "Создано СВОЯ AI Coding Agent. Task ID: $TASK_ID. Ветка: $BRANCH. Слияние в main выполняется только после отдельного подтверждения.")"
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Draft PR: $PR_URL"
+
       - name: Collect report
         if: always()
         run: |
@@ -139,6 +152,9 @@ jobs:
             echo
             echo "=== Branch ==="
             echo "${{ steps.branch.outputs.branch }}"
+            echo
+            echo "=== Draft PR ==="
+            echo "${{ steps.pr.outputs.pr_url }}"
             echo
             echo "=== Git status ==="
             git status --short
