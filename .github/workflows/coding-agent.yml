@@ -125,13 +125,35 @@ jobs:
           trap 'kill "$BROKER_PID" 2>/dev/null || true; rm -f /tmp/svoya-broker.mjs' EXIT
           sleep 1
 
-          export OPENCODE_CONFIG_CONTENT="$(node -e 'process.stdout.write(JSON.stringify({" +
-            "'$schema'":"https://opencode.ai/config.json",model:"svoya-agent/agent",providers:{" +
-            "'svoya-agent'":{name:"Svoya AI Agent Broker",package:"@opencode/ai/providers/openai-compatible",settings:{baseURL:"http://127.0.0.1:8786/v1",apiKey:"broker-local-only"},models:{agent:{name:process.env.CODING_MODEL,modelID:process.env.CODING_MODEL}}}," +
-            experimental:{policies:[" +
-              {action:"permission",resource:"shell:git push *",effect:"deny"},{action:"permission",resource:"shell:curl *",effect:"deny"},{action:"permission",resource:"shell:wget *",effect:"deny"},{action:"permission",resource:"shell:ssh *",effect:"deny"},{action:"permission",resource:"shell:scp *",effect:"deny"},{action:"permission",resource:"shell:nc *",effect:"deny"},{action:"permission",resource:"shell:env",effect:"deny"},{action:"permission",resource:"shell:printenv *",effect:"deny"},{action:"permission",resource:"read:*.env",effect:"deny"},{action:"permission",resource:"read:*.env.*",effect:"deny"}" +
-            ]}}))')"
-
+          cat > /tmp/opencode-agent.json <<EOF
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "model": "svoya-agent/agent",
+            "providers": {
+              "svoya-agent": {
+                "name": "Svoya AI Agent Broker",
+                "package": "@opencode/ai/providers/openai-compatible",
+                "settings": { "baseURL": "http://127.0.0.1:8786/v1", "apiKey": "broker-local-only" },
+                "models": { "agent": { "name": "$CODING_MODEL", "modelID": "$CODING_MODEL" } }
+              }
+            },
+            "experimental": {
+              "policies": [
+                { "action": "permission", "resource": "shell:git push *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:curl *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:wget *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:ssh *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:scp *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:nc *", "effect": "deny" },
+                { "action": "permission", "resource": "shell:env", "effect": "deny" },
+                { "action": "permission", "resource": "shell:printenv *", "effect": "deny" },
+                { "action": "permission", "resource": "read:*.env", "effect": "deny" },
+                { "action": "permission", "resource": "read:*.env.*", "effect": "deny" }
+              ]
+            }
+          }
+          EOF
+          export OPENCODE_CONFIG_CONTENT="$(cat /tmp/opencode-agent.json)"
           unset OPENROUTER_API_KEY
           opencode run --standalone --model "svoya-agent/agent" --format default "$CODING_TASK"
 
