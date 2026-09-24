@@ -135,7 +135,15 @@ jobs:
           fi
 
           CHANGED_FILES="$(git status --short | wc -l | tr -d ' ')"
-          DIFF_BYTES="$(git diff --binary | wc -c | tr -d ' ')"
+
+          # Build a temporary index so tracked + untracked changes are verified as one candidate diff.
+          VERIFY_INDEX="$(mktemp)"
+          cp .git/index "$VERIFY_INDEX"
+          GIT_INDEX_FILE="$VERIFY_INDEX" git add -A
+          GIT_INDEX_FILE="$VERIFY_INDEX" git diff --cached --binary --no-ext-diff > /tmp/svoya-candidate.diff
+          rm -f "$VERIFY_INDEX"
+
+          DIFF_BYTES="$(wc -c < /tmp/svoya-candidate.diff | tr -d ' ')"
 
           if [ "$CHANGED_FILES" -gt 30 ]; then
             echo "::error::Too many changed paths ($CHANGED_FILES). Safety limit is 30."
@@ -175,11 +183,16 @@ jobs:
           fi
 
           node <<'NODE'
-          const { execFileSync } = require("child_process");
+          const fs = require("fs");
           const task = process.env.CODING_TASK || "";
-          const model = process.env.VERIFIER_MODEL || "openrouter/free";
-          const diff = execFileSync("git", ["diff", "--binary", "--no-ext-diff"], { encoding: "utf8", maxBuffer: 300000 });
-          const limitedDiff = diff.slice(0, 180000);
+          const model = process.env.VERIFIER_MODEL;
+          if (!model) { console.error("Missing verifier model."); process.exit(1); }
+          const diff = fs.readFileSync("/tmp/svoya-candidate.diff", "utf8");
+          if (diff.length > 180000) {
+            console.error("Candidate diff exceeds semantic verifier input limit. Failing closed.");
+            process.exit(1);
+          }
+          const limitedDiff = diff;
           const prompt = [
             "You are the Semantic Verifier for an autonomous coding agent.",
             "Evaluate whether the repository diff satisfies the coding task.",
