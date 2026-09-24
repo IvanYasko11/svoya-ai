@@ -47,6 +47,7 @@ jobs:
           INPUT_TASK: ${{ inputs.task }}
           INPUT_MODEL: ${{ inputs.model }}
           INPUT_APPLY: ${{ inputs.apply_changes }}
+          DISPATCH_TASK_ID: ${{ github.event.client_payload.task_id }}
         run: |
           TASK="${DISPATCH_TASK:-$INPUT_TASK}"
           MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
@@ -62,9 +63,21 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "model=$MODEL" >> "$GITHUB_OUTPUT"
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
+          TASK_ID="${DISPATCH_TASK_ID:-${{ github.run_id }}}"
+          echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
 
       - name: Install OpenCode
         run: npm install --global @opencode/cli
+
+      - name: Prepare isolated branch
+        id: branch
+        if: steps.task.outputs.apply == 'true'
+        env:
+          TASK_ID: ${{ steps.task.outputs.task_id }}
+        run: |
+          BRANCH="ai/coding-${TASK_ID}"
+          git switch -c "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Run OpenCode coding agent
         env:
@@ -109,7 +122,7 @@ jobs:
           git add -A
           git diff --cached --check
           git commit -m "feat(ai): apply coding agent task"
-          git push
+          git push --set-upstream origin "${{ steps.branch.outputs.branch }}"
 
       - name: Collect report
         if: always()
@@ -120,6 +133,12 @@ jobs:
             echo
             echo "=== Apply changes ==="
             echo "${{ steps.task.outputs.apply }}"
+            echo
+            echo "=== Task ID ==="
+            echo "${{ steps.task.outputs.task_id }}"
+            echo
+            echo "=== Branch ==="
+            echo "${{ steps.branch.outputs.branch }}"
             echo
             echo "=== Git status ==="
             git status --short
