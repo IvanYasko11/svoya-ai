@@ -248,7 +248,7 @@ jobs:
         if: steps.verify.outputs.changed == 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VERIFIER_MODEL: ${{ vars.SEMANTIC_VERIFIER_MODEL }}
+          VERIFIER_MODEL: ${{ vars.SEMANTIC_VERIFIER_MODEL || 'openrouter/free' }}
           CODING_TASK: ${{ steps.task.outputs.task }}
           CODING_MODEL: ${{ steps.task.outputs.model }}
         run: |
