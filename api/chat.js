@@ -160,9 +160,10 @@ export default async function handler(req, res) {
     }
 
     let codingApply = false;
+    let approvedTaskId = null;
     if (isCoding && confirmed) {
       if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение недоступно." });
-      const approvedTaskId = await consumeApproval({
+      approvedTaskId = await consumeApproval({
         task,
         token: (() => {
           const cookieHeader = req.headers?.cookie || "";
