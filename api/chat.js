@@ -2,19 +2,19 @@ function classifyRisk(task) {
   const text = task.toLowerCase();
 
   const highRiskPatterns = [
-    /\b(парол|password|api[-_ ]?key|секрет|secret|токен|token)\b/i,
-    /\b(оплат|плат[еи]|перевод|покупк|payment|purchase)\b/i,
-    /\b(удал[иь]|delete|стереть|уничтож)\b/i,
-    /\b(опубликов|publish|размести|выложи)\b/i,
-    /\b(войти|логин|login|авториз|sign[ -]?in)\b/i
+    /(парол|password|api[-_ ]?key|секрет|secret|токен|token)/i,
+    /(оплат|плат[еи]|перевод|покупк|payment|purchase)/i,
+    /(удал[иь]|delete|стереть|уничтож)/i,
+    /(опубликов|publish|размести|выложи)/i,
+    /(войти|логин|login|авториз|sign[ -]?in)/i
   ];
 
   const mediumRiskPatterns = [
-    /\b(отправ[ьи]|send|сообщен|email|почт|письм)\b/i,
-    /\b(измен[ьи]|modify|обнов[ьи]|update)\b/i,
-    /\b(создай.*файл|измен[ьи].*файл|файл.*измен)\b/i,
-    /\b(запусти|execute|выполн)\b/i,
-    /\b(броузер|browser|сайт|website)\b/i
+    /(отправ[ьи]|send|сообщен|email|электронн.*почт|почт[аые]|письм)/i,
+    /(измен[ьи]|modify|обнов[ьи]|update)/i,
+    /(создай.*файл|измен[ьи].*файл|файл.*измен)/i,
+    /(запусти|execute|выполн)/i,
+    /(броузер|browser|сайт|website)/i
   ];
 
   if (highRiskPatterns.some((pattern) => pattern.test(text))) {
