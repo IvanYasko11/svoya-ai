@@ -12,21 +12,16 @@ on:
         required: false
         default: "cohere/north-mini-code:free"
         type: string
-      verify_file:
-        description: "Optional file path to verify"
+      apply_changes:
+        description: "Create a commit with verified changes"
         required: false
-        default: ""
+        default: "false"
         type: string
-      expected_content:
-        description: "Optional exact UTF-8 content expected in verify_file"
-        required: false
-        default: ""
-        type: string
+  repository_dispatch:
+    types: [svoya-coding-task]
 
-# TEST MODE: the agent may edit the temporary runner workspace,
-# but this workflow cannot push or modify the repository.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   coding-agent:
@@ -38,7 +33,32 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
+
+      - name: Read task
+        id: task
+        env:
+          DISPATCH_TASK: ${{ github.event.client_payload.task }}
+          DISPATCH_MODEL: ${{ github.event.client_payload.model }}
+          DISPATCH_APPLY: ${{ github.event.client_payload.apply_changes }}
+          INPUT_TASK: ${{ inputs.task }}
+          INPUT_MODEL: ${{ inputs.model }}
+          INPUT_APPLY: ${{ inputs.apply_changes }}
+        run: |
+          TASK="${DISPATCH_TASK:-$INPUT_TASK}"
+          MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
+          APPLY="${DISPATCH_APPLY:-${INPUT_APPLY:-false}}"
+
+          if [ -z "$TASK" ]; then
+            echo "::error::No coding task supplied."
+            exit 1
+          fi
+
+          echo "task<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$TASK" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+          echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
 
       - name: Install OpenCode
         run: npm install --global @opencode/cli
@@ -46,57 +66,58 @@ jobs:
       - name: Run OpenCode coding agent
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CODING_TASK: ${{ inputs.task }}
-          CODING_MODEL: ${{ inputs.model }}
+          CODING_TASK: ${{ steps.task.outputs.task }}
+          CODING_MODEL: ${{ steps.task.outputs.model }}
         run: |
           if [ -z "$OPENROUTER_API_KEY" ]; then
             echo "::error::GitHub secret OPENROUTER_API_KEY is not configured."
             exit 1
           fi
 
-          opencode run             --standalone             --model "openrouter/$CODING_MODEL"             --format default             "$CODING_TASK"
+          opencode run \
+            --standalone \
+            --model "openrouter/$CODING_MODEL" \
+            --format default \
+            "$CODING_TASK"
 
-      - name: Verify agent output
-        if: always()
-        env:
-          VERIFY_FILE: ${{ inputs.verify_file }}
-          EXPECTED_CONTENT: ${{ inputs.expected_content }}
+      - name: Verify changes
+        id: verify
         run: |
-          if [ -z "$VERIFY_FILE" ]; then
-            echo "CODING AGENT VERIFIER: SKIP — no verify_file provided."
+          echo "=== Git status ==="
+          git status --short
+          echo
+          echo "=== Diff stat ==="
+          git diff --stat
+
+          if git diff --quiet && [ -z "$(git status --short)" ]; then
+            echo "::warning::CODING AGENT VERIFIER: no repository changes detected."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ ! -f "$VERIFY_FILE" ]; then
-            echo "::error::CODING AGENT VERIFIER: FAIL — expected file not found: $VERIFY_FILE"
-            exit 1
-          fi
+          echo "CODING AGENT VERIFIER: PASS — repository changes detected."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-          if [ -n "$EXPECTED_CONTENT" ]; then
-            python - "$VERIFY_FILE" "$EXPECTED_CONTENT" <<'PY'
-          import sys
-          from pathlib import Path
+      - name: Create safe commit
+        if: steps.verify.outputs.changed == 'true' && steps.task.outputs.apply == 'true'
+        run: |
+          git config user.name "SVoya AI Coding Agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(ai): apply coding agent task"
+          git push
 
-          file_path = Path(sys.argv[1])
-          expected = sys.argv[2]
-          actual = file_path.read_text(encoding="utf-8")
-
-          if actual != expected:
-              print("::error::CODING AGENT VERIFIER: FAIL — file content does not exactly match expected content.")
-              print(f"Expected bytes: {len(expected.encode('utf-8'))}")
-              print(f"Actual bytes:   {len(actual.encode('utf-8'))}")
-              raise SystemExit(1)
-
-          print("CODING AGENT VERIFIER: PASS — file exists and exact content matches.")
-          PY
-          else
-            echo "CODING AGENT VERIFIER: PASS — file exists."
-          fi
-
-      - name: Collect test results
+      - name: Collect report
         if: always()
         run: |
           {
+            echo "=== Task ==="
+            printf '%s\n' "${{ steps.task.outputs.task }}"
+            echo
+            echo "=== Apply changes ==="
+            echo "${{ steps.task.outputs.apply }}"
+            echo
             echo "=== Git status ==="
             git status --short
             echo
@@ -105,27 +126,11 @@ jobs:
             echo
             echo "=== Diff ==="
             git diff --binary
-            echo
-            if [ -n "${{ inputs.verify_file }}" ] && [ -f "${{ inputs.verify_file }}" ]; then
-              echo "=== Verified file content ==="
-              cat "${{ inputs.verify_file }}"
-            fi
           } > coding-agent-report.txt
 
-          git diff --binary > coding-agent.patch
-
-      - name: Upload test artifacts
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: coding-agent-test-results
-          path: |
-            coding-agent-report.txt
-            coding-agent.patch
-            ${{ inputs.verify_file }}
-
-      - name: Safety check
-        if: always()
-        run: |
-          echo "TEST MODE: no commit and no push are performed."
-          echo "Changes, if any, are available only in the workflow artifacts."
+          name: coding-agent-results
+          path: coding-agent-report.txt
