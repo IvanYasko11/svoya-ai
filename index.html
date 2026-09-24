@@ -21,7 +21,7 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.1 • Smart Router</div></div>
 <section class="card">
 <div class="muted">Команда</div>
-<textarea id="task">Объясни простыми словами, что такое AI-агент.</textarea>
+<textarea id="task" placeholder=""></textarea>
 <button id="run">Запустить</button>
 <div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div>
 <div class="steps">
@@ -35,6 +35,22 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </main>
 <script>
 const $=id=>document.getElementById(id);
+
+// Поле команды всегда пустое. Подсказка меняется при каждом открытии страницы.
+const examples=[
+  "Что сейчас происходит в мире ИИ?",
+  "Найди способ заработать первые деньги онлайн без вложений.",
+  "Проверь эту идею на слабые места.",
+  "Напиши простой код и объясни, как он работает.",
+  "Сравни несколько вариантов и покажи различия.",
+  "Исследуй тему и дай короткий вывод.",
+  "Помоги мне автоматизировать эту задачу.",
+  "Разбери мой план в режиме Red Team."
+];
+const taskInput=$("task");
+taskInput.placeholder=examples[Math.floor(Math.random()*examples.length)];
+
+
 
 function verifyResponse(data, task){
   const answer=typeof data?.answer==="string"?data.answer.trim():"";
