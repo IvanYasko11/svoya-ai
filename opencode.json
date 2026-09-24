@@ -6,5 +6,19 @@
       "resource": "git push *",
       "effect": "deny"
     }
-  ]
+  ],
+  "experimental": {
+    "policies": [
+      { "action": "permission", "resource": "shell:git push *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:curl *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:wget *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:ssh *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:scp *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:nc *", "effect": "deny" },
+      { "action": "permission", "resource": "shell:env", "effect": "deny" },
+      { "action": "permission", "resource": "shell:printenv *", "effect": "deny" },
+      { "action": "permission", "resource": "read:*.env", "effect": "deny" },
+      { "action": "permission", "resource": "read:*.env.*", "effect": "deny" }
+    ]
+  }
 }
