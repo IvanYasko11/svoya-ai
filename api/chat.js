@@ -68,17 +68,24 @@ export default async function handler(req, res) {
     const risk = classifyRisk(task);
     const routing = classifyIntent(task);
     const confirmed = body?.confirmed === true;
-    const codingApply = routing.route === "CODING_AGENT" && confirmed;
+    const preview = body?.preview === true;
+    const isCoding = routing.route === "CODING_AGENT";
+    const needsApproval = isCoding || risk.requiresConfirmation;
+    const codingApply = isCoding && confirmed && !preview;
 
-    if (risk.requiresConfirmation && !codingApply && routing.route !== "CODING_AGENT") {
+    if (needsApproval && !confirmed && !(isCoding && preview)) {
       return res.status(409).json({
         ok: false,
         risk_level: risk.level,
         requires_confirmation: true,
-        error:
-          risk.level === "HIGH"
-            ? "Команда относится к действиям высокого риска. Сначала требуется явное подтверждение непосредственно перед выполнением."
-            : "Команда относится к действиям среднего риска. Сначала требуется явное подтверждение перед выполнением."
+        intent: routing.intent,
+        route: routing.route,
+        confirmation_type: isCoding ? "CODING_APPLY" : risk.level,
+        error: isCoding
+          ? "Coding Agent готов выполнить задачу, но применение изменений требует отдельного подтверждения."
+          : risk.level === "HIGH"
+            ? "Команда относится к действиям высокого риска. Требуется явное подтверждение непосредственно перед выполнением."
+            : "Команда относится к действиям среднего риска. Требуется явное подтверждение непосредственно перед выполнением."
       });
     }
 
@@ -173,9 +180,9 @@ export default async function handler(req, res) {
       return res.status(202).json({
         ok: true,
         risk_level: risk.level,
-        requires_confirmation: risk.requiresConfirmation && !confirmed,
+        requires_confirmation: needsApproval && !confirmed && !preview,
         apply_changes: codingApply,
-        preview: !codingApply,
+        preview: isCoding && !codingApply,
         intent: routing.intent,
         route: routing.route,
         provider: "GitHub Actions + OpenCode",
