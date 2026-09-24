@@ -49,6 +49,35 @@ export default async function handler(req, res) {
       ? (run.conclusion === "success" ? "completed" : "failed")
       : "running";
 
+    let pr = null;
+    if (status === "completed") {
+      const branch = "ai/coding-" + taskId;
+      try {
+        const prResponse = await fetch(
+          "https://api.github.com/repos/IvanYasko11/svoya-ai/pulls?state=open&head=IvanYasko11:" + encodeURIComponent(branch) + "&per_page=1",
+          {
+            headers: {
+              Authorization: "Bearer " + token,
+              Accept: "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "Svoya-AI"
+            }
+          }
+        );
+        if (prResponse.ok) {
+          const prs = await prResponse.json();
+          if (Array.isArray(prs) && prs[0]) {
+            pr = {
+              number: prs[0].number,
+              url: prs[0].html_url,
+              draft: Boolean(prs[0].draft),
+              head: prs[0].head?.ref || branch
+            };
+          }
+        }
+      } catch {}
+    }
+
     return res.status(200).json({
       ok: true,
       task_id: taskId,
@@ -56,6 +85,7 @@ export default async function handler(req, res) {
       conclusion: run.conclusion || null,
       run_id: run.id,
       url: run.html_url,
+      pr,
       created_at: run.created_at,
       updated_at: run.updated_at
     });
