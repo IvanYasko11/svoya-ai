@@ -138,6 +138,11 @@ $("run").onclick=async()=>{
    }
 
    if(!response.ok){
+     if(response.status===409 && data?.requires_confirmation){
+       showApproval(data,task);
+       $("result").textContent="Остановлено перед потенциально опасным действием. Выбери действие выше.";
+       return;
+     }
      $("verify").textContent=data?.requires_confirmation?"BLOCK — Risk Gate":"FAIL";
      $("status").textContent=data?.requires_confirmation?"Остановлено Risk Gate":"Нужна настройка";
      $("result").textContent=(data?.requires_confirmation?"ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ\n\n":"НЕ ГОТОВО\n\n")+(data?.error||"Ошибка API");
