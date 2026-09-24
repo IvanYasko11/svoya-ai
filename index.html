@@ -18,7 +18,7 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </head>
 <body>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.1 • Smart Router</div></div>
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.3 • Autopilot</div></div>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task" placeholder=""></textarea>
@@ -104,6 +104,40 @@ $("run").onclick=async()=>{
    $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
    $("result").textContent="PASS\n\n"+data.answer+"\n\nПровайдер: "+data.provider+"\nМодель: "+data.model;
+   if(data.route==="CODING_AGENT" && data.task_id){
+     $("activityText").textContent="Coding Agent запущен — жду результат…";
+     let attempts=0;
+     const poll=async()=>{
+       attempts++;
+       try{
+         const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id));
+         const sd=await sr.json();
+         if(sd.status==="completed"){
+           $("activityText").textContent="Coding Agent завершил работу.";
+           $("result").textContent+="\n\nСтатус агента: COMPLETED\nRun: "+sd.run_id;
+           $("status").textContent="Готово";
+           if(sd.url) $("result").textContent+="\nGitHub Actions: "+sd.url;
+           return;
+         }
+         if(sd.status==="failed"){
+           $("activityText").textContent="Coding Agent завершил работу с ошибкой.";
+           $("result").textContent+="\n\nСтатус агента: FAILED\nRun: "+sd.run_id;
+           $("status").textContent="Агент завершил с ошибкой";
+           return;
+         }
+         if(attempts<15){
+           $("activityText").textContent="Coding Agent работает… попытка "+attempts+"/15";
+           setTimeout(poll,2000);
+         }else{
+           $("activityText").textContent="Агент продолжает работу в GitHub Actions.";
+           $("result").textContent+="\n\nСтатус агента: RUNNING/QUEUED";
+         }
+       }catch{
+         if(attempts<15) setTimeout(poll,2000);
+       }
+     };
+     setTimeout(poll,1500);
+   }
  }catch(e){
    $("activityText").textContent="Выполнение остановлено.";
    $("progressBar").style.width="100%";
