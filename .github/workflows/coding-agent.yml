@@ -169,6 +169,11 @@ jobs:
             exit 1
           fi
 
+          if [ -z "$VERIFIER_MODEL" ]; then
+            echo "::error::SEMANTIC_VERIFIER_MODEL is not configured. Refusing to use an implicit model."
+            exit 1
+          fi
+
           node <<'NODE'
           const { execFileSync } = require("child_process");
           const task = process.env.CODING_TASK || "";
@@ -214,6 +219,16 @@ jobs:
             if (start < 0 || end <= start) { console.error("Semantic Verifier returned no JSON."); process.exit(1); }
             let result;
             try { result = JSON.parse(content.slice(start, end + 1)); } catch { console.error("Semantic Verifier returned invalid JSON."); process.exit(1); }
+            if (
+              (result.decision !== "PASS" && result.decision !== "FAIL") ||
+              typeof result.summary !== "string" ||
+              !Array.isArray(result.issues) ||
+              result.issues.some((issue) => typeof issue !== "string")
+            ) {
+              console.error("Semantic Verifier returned an invalid schema. Failing closed.");
+              process.exit(1);
+            }
+
             if (result.decision !== "PASS") {
               console.error("SEMANTIC VERIFIER: FAIL");
               console.error(result.summary || "Change did not satisfy the task.");
