@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 function classifyRisk(task) {
   const text = task.toLowerCase();
   const normalizedText = text.replace(/[\s.,!?;:'"()\[\]{}<>_\-+=*\/\\]+/g, "");
@@ -21,47 +23,113 @@ function classifyRisk(task) {
   if (highRiskPatterns.some((pattern) => pattern.test(text) || pattern.test(normalizedText))) {
     return { level: "HIGH", requiresConfirmation: true };
   }
-
   if (mediumRiskPatterns.some((pattern) => pattern.test(text) || pattern.test(normalizedText))) {
     return { level: "MEDIUM", requiresConfirmation: true };
   }
-
   return { level: "LOW", requiresConfirmation: false };
 }
 
 function classifyIntent(task) {
   const text = task.toLowerCase();
-
   if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
     return { intent: "CODING", route: "CODING_AGENT" };
   }
-
   if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
     return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
   }
-
   if (/(сейчас|сегодня|последн|актуаль|новост|цена|курс|погода|интернет|исследуй|research)/i.test(text)) {
     return { intent: "WEB_RESEARCH", route: "WEB_RESEARCH" };
   }
-
   return { intent: "GENERAL", route: "LLM" };
 }
 
-import crypto from "node:crypto";
+function hash(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function getSession(req, res) {
+  const cookieHeader = req.headers?.cookie || "";
+  const match = cookieHeader.match(/(?:^|;\s*)svoya_session=([^;]+)/);
+  let session = match ? decodeURIComponent(match[1]) : "";
+  if (!session || session.length < 32) {
+    session = crypto.randomBytes(32).toString("base64url");
+    res.setHeader("Set-Cookie", "svoya_session=" + encodeURIComponent(session) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000");
+  }
+  return session;
+}
+
+async function createApproval({ task, taskId, session, dbKey }) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const tokenHash = hash(token);
+  const response = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals", {
+    method: "POST",
+    headers: {
+      apikey: dbKey,
+      Authorization: "Bearer " + dbKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({
+      task_hash: hash(task),
+      task_id: taskId,
+      approval_token_hash: tokenHash,
+      session_hash: hash(session)
+    })
+  });
+  if (!response.ok) throw new Error("Не удалось создать approval.");
+  return token;
+}
+
+async function consumeApproval({ task, token, session, dbKey }) {
+  if (!token || !session) return false;
+  const tokenHash = hash(token);
+  const sessionHash = hash(session);
+  const response = await fetch(
+    "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals?approval_token_hash=eq." +
+      encodeURIComponent(tokenHash) +
+      "&task_hash=eq." + encodeURIComponent(hash(task)) +
+      "&session_hash=eq." + encodeURIComponent(sessionHash) +
+      "&status=eq.pending&expires_at=gt." + encodeURIComponent(new Date().toISOString()) +
+      "&select=id&limit=1",
+    {
+      headers: {
+        apikey: dbKey,
+        Authorization: "Bearer " + dbKey
+      }
+    }
+  );
+  if (!response.ok) return false;
+  const rows = await response.json();
+  if (!Array.isArray(rows) || !rows[0]?.id) return false;
+
+  const update = await fetch(
+    "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals?id=eq." +
+      encodeURIComponent(rows[0].id) +
+      "&status=eq.pending",
+    {
+      method: "PATCH",
+      headers: {
+        apikey: dbKey,
+        Authorization: "Bearer " + dbKey,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({ status: "used", used_at: new Date().toISOString() })
+    }
+  );
+  return update.ok;
+}
 
 export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const task = typeof body?.task === "string" ? body.task.trim() : "";
-
     if (!task) return res.status(400).json({ error: "Пустая команда." });
     if (task.length > 12000) return res.status(400).json({ error: "Команда слишком длинная." });
 
@@ -71,9 +139,20 @@ export default async function handler(req, res) {
     const preview = body?.preview === true;
     const isCoding = routing.route === "CODING_AGENT";
     const needsApproval = isCoding || risk.requiresConfirmation;
-    const codingApply = isCoding && confirmed && !preview;
+    const dbKey = process.env.SUPABASE_SECRET_KEY;
+    const session = getSession(req, res);
 
     if (needsApproval && !confirmed && !(isCoding && preview)) {
+      if (isCoding && !dbKey) {
+        return res.status(503).json({ error: "Безопасное подтверждение временно недоступно: SUPABASE_SECRET_KEY не настроен." });
+      }
+
+      let approvalToken = null;
+      if (isCoding) {
+        const taskId = crypto.randomUUID();
+        approvalToken = await createApproval({ task, taskId, session, dbKey });
+      }
+
       return res.status(409).json({
         ok: false,
         risk_level: risk.level,
@@ -81,6 +160,7 @@ export default async function handler(req, res) {
         intent: routing.intent,
         route: routing.route,
         confirmation_type: isCoding ? "CODING_APPLY" : risk.level,
+        approval_token: approvalToken,
         error: isCoding
           ? "Coding Agent готов выполнить задачу, но применение изменений требует отдельного подтверждения."
           : risk.level === "HIGH"
@@ -89,67 +169,74 @@ export default async function handler(req, res) {
       });
     }
 
+    let codingApply = false;
+    if (isCoding && confirmed) {
+      if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение недоступно." });
+      const approvalOk = await consumeApproval({
+        task,
+        token: typeof body?.approval_token === "string" ? body.approval_token : "",
+        session,
+        dbKey
+      });
+      if (!approvalOk) {
+        return res.status(403).json({
+          ok: false,
+          requires_confirmation: true,
+          error: "Подтверждение недействительно, уже использовано или истекло. Запроси новое разрешение."
+        });
+      }
+      codingApply = true;
+    }
+
     if (routing.route === "CODING_AGENT") {
       const githubToken = process.env.GITHUB_DISPATCH_TOKEN;
-
       if (!githubToken) {
-        return res.status(503).json({
-          error: "Coding Agent не подключён: GITHUB_DISPATCH_TOKEN не настроен."
-        });
+        return res.status(503).json({ error: "Coding Agent не подключён: GITHUB_DISPATCH_TOKEN не настроен." });
       }
 
       const codingModel = process.env.CODING_AGENT_MODEL || "cohere/north-mini-code:free";
       const taskId = crypto.randomUUID();
 
-      const dispatchResponse = await fetch(
-        "https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${githubToken}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "Content-Type": "application/json",
-            "User-Agent": "Svoya-AI"
-          },
-          body: JSON.stringify({
-            event_type: "svoya-coding-task",
-            client_payload: {
-              task,
-              task_id: taskId,
-              model: codingModel,
-              apply_changes: codingApply ? "true" : "false"
-            }
-          })
-        }
-      );
+      const dispatchResponse = await fetch("https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + githubToken,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json",
+          "User-Agent": "Svoya-AI"
+        },
+        body: JSON.stringify({
+          event_type: "svoya-coding-task",
+          client_payload: {
+            task,
+            task_id: taskId,
+            model: codingModel,
+            apply_changes: codingApply ? "true" : "false"
+          }
+        })
+      });
 
       if (!dispatchResponse.ok) {
         const raw = await dispatchResponse.text();
         let githubMessage = raw;
-        try {
-          const parsed = raw ? JSON.parse(raw) : {};
-          githubMessage = parsed?.message || raw;
-        } catch {}
-
+        try { githubMessage = (raw ? JSON.parse(raw)?.message : "") || raw; } catch {}
         return res.status(502).json({
           error: "GitHub не принял задачу Coding Agent.",
           github_status: dispatchResponse.status,
           details: githubMessage,
-          hint:
-            dispatchResponse.status === 401
-              ? "GITHUB_DISPATCH_TOKEN недействителен или истёк."
-              : dispatchResponse.status === 403
-                ? "У токена GITHUB_DISPATCH_TOKEN недостаточно прав для repository_dispatch. Нужен доступ к репозиторию с правом Contents: Read and write."
-                : "Проверь GITHUB_DISPATCH_TOKEN и доступ репозитория."
+          hint: dispatchResponse.status === 401
+            ? "GITHUB_DISPATCH_TOKEN недействителен или истёк."
+            : dispatchResponse.status === 403
+              ? "У токена GITHUB_DISPATCH_TOKEN недостаточно прав для repository_dispatch. Нужен доступ к репозиторию с правом Contents: Read and write."
+              : "Проверь GITHUB_DISPATCH_TOKEN и доступ репозитория."
         });
       }
 
       const answer = codingApply
         ? "Coding Agent запущен с подтверждением. Изменения будут применены только в изолированную ветку и оформлены в Draft PR. В main ничего не сливается автоматически."
-        : "Coding Agent подключён. Задача поставлена в безопасный preview-режим. Изменения в репозиторий не применяются. Чтобы разрешить применение, повторите задачу с отдельным подтверждением.";
+        : "Coding Agent подключён. Задача поставлена в безопасный preview-режим. Изменения в репозиторий не применяются.";
 
-      const dbKey = process.env["SUPABASE_SECRET_KEY"];
       if (dbKey) {
         try {
           await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
@@ -180,9 +267,9 @@ export default async function handler(req, res) {
       return res.status(202).json({
         ok: true,
         risk_level: risk.level,
-        requires_confirmation: needsApproval && !confirmed && !preview,
+        requires_confirmation: false,
         apply_changes: codingApply,
-        preview: isCoding && !codingApply,
+        preview: !codingApply,
         intent: routing.intent,
         route: routing.route,
         provider: "GitHub Actions + OpenCode",
@@ -194,21 +281,14 @@ export default async function handler(req, res) {
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const openAIKey = process.env.OPENAI_API_KEY;
-
     if (!openRouterKey && !openAIKey) {
-      return res.status(503).json({
-        error: "Не настроен API-провайдер. Добавь OPENROUTER_API_KEY в Vercel → Environment Variables."
-      });
+      return res.status(503).json({ error: "Не настроен API-провайдер. Добавь OPENROUTER_API_KEY в Vercel → Environment Variables." });
     }
 
     const useOpenRouter = Boolean(openRouterKey);
     const apiKey = useOpenRouter ? openRouterKey : openAIKey;
-    const endpoint = useOpenRouter
-      ? "https://openrouter.ai/api/v1/chat/completions"
-      : "https://api.openai.com/v1/responses";
-    const model = useOpenRouter
-      ? (process.env.OPENROUTER_MODEL || "openrouter/free")
-      : (process.env.OPENAI_MODEL || "gpt-5.6-luna");
+    const endpoint = useOpenRouter ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/responses";
+    const model = useOpenRouter ? (process.env.OPENROUTER_MODEL || "openrouter/free") : (process.env.OPENAI_MODEL || "gpt-5.6-luna");
 
     const requestBody = useOpenRouter
       ? {
@@ -216,62 +296,38 @@ export default async function handler(req, res) {
           messages: [
             {
               role: "system",
-              content:
-                "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. " +
-                "Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. " +
-                "Будь кратким и практичным."
+              content: "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. Будь кратким и практичным."
             },
             { role: "user", content: task }
           ]
         }
       : {
           model,
-          instructions:
-            "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. " +
-            "Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. " +
-            "Будь кратким и практичным.",
+          instructions: "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. Будь кратким и практичным.",
           input: task,
           store: false
         };
 
-    const headers = {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    };
-
+    const headers = { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" };
     if (useOpenRouter) {
       headers["HTTP-Referer"] = "https://svoya-ai.vercel.app";
       headers["X-Title"] = "Svoya AI";
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody)
-    });
-
+    const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(requestBody) });
     const raw = await response.text();
     let data = {};
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch {
-      data = {};
-    }
+    try { data = raw ? JSON.parse(raw) : {}; } catch {}
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: data?.error?.message || raw || `LLM API вернул HTTP ${response.status}.`
-      });
+      return res.status(response.status).json({ error: data?.error?.message || raw || "LLM API error." });
     }
 
-    const answer = useOpenRouter
-      ? data?.choices?.[0]?.message?.content
-      : data?.output_text;
+    const answer = useOpenRouter ? data?.choices?.[0]?.message?.content : data?.output_text;
 
-    const dbKey = process.env["SUPABASE_SECRET_KEY"];
     if (dbKey) {
       try {
-        const memoryResponse = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+        await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
           method: "POST",
           headers: {
             apikey: dbKey,
@@ -291,10 +347,6 @@ export default async function handler(req, res) {
             verification_status: "pending"
           })
         });
-
-        if (!memoryResponse.ok) {
-          console.error("Database save failed:", await memoryResponse.text());
-        }
       } catch (memoryError) {
         console.error("Database save failed:", memoryError?.message || memoryError);
       }
@@ -311,8 +363,6 @@ export default async function handler(req, res) {
       answer: answer || "Модель не вернула текст."
     });
   } catch (error) {
-    return res.status(500).json({
-      error: `Ошибка соединения с LLM API: ${error?.message || "неизвестная ошибка"}`
-    });
+    return res.status(500).json({ error: "Ошибка соединения с LLM API: " + (error?.message || "неизвестная ошибка") });
   }
 }
