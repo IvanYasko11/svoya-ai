@@ -18,11 +18,12 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </head>
 <body>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.3 • Autopilot</div></div>
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.4 • Safe Apply</div></div>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task" placeholder=""></textarea>
 <button id="run">Запустить</button>
+<label style="display:block;margin-top:12px;color:#9aa6c0;font-size:14px"><input id="applyChanges" type="checkbox" style="margin-right:8px">Разрешить Coding Agent применить изменения (отдельная ветка + Draft PR; main не изменяется)</label>
 <div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
 <div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
@@ -54,7 +55,14 @@ taskInput.placeholder=examples[Math.floor(Math.random()*examples.length)];
 
 function verifyResponse(data, task){
   const answer=typeof data?.answer==="string"?data.answer.trim():"";
-  const checks=[
+  const isCoding=data?.route==="CODING_AGENT";
+  const checks=isCoding?[
+    ["Ответ существует",answer.length>0],
+    ["Провайдер указан",typeof data?.provider==="string"&&data.provider.length>0],
+    ["Модель указана",typeof data?.model==="string"&&data.model.length>0],
+    ["Запрос не пустой",task.trim().length>0],
+    ["Task ID указан",typeof data?.task_id==="string"&&data.task_id.length>0]
+  ]:[
     ["Ответ существует",answer.length>0],
     ["Провайдер указан",typeof data?.provider==="string"&&data.provider.length>0],
     ["Модель указана",typeof data?.model==="string"&&data.model.length>0],
@@ -62,7 +70,7 @@ function verifyResponse(data, task){
     ["Risk Gate LOW",data?.risk_level==="LOW"&&data?.requires_confirmation===false]
   ];
   const passed=checks.filter(x=>x[1]).length;
-  return {ok:passed===checks.length,summary:`${passed}/${checks.length} технических проверок пройдено`};
+  return {ok:passed===checks.length,summary:passed+"/"+checks.length+" технических проверок пройдено"};
 }
 
 $("run").onclick=async()=>{
@@ -79,7 +87,7 @@ $("run").onclick=async()=>{
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task})});
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,confirmed:$("applyChanges").checked})});
    const data=await response.json();
 
    if(data?.risk_level){
@@ -103,7 +111,7 @@ $("run").onclick=async()=>{
    await new Promise(r=>setTimeout(r,200));
    $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
-   $("result").textContent="PASS\n\n"+data.answer+"\n\nПровайдер: "+data.provider+"\nМодель: "+data.model;
+   $("result").textContent="PASS\n\n"+data.answer+"\n\nРежим: "+(data.apply_changes?"APPLY → изолированная ветка + Draft PR":"PREVIEW → без изменений в репозитории")+"\nПровайдер: "+data.provider+"\nМодель: "+data.model;
    if(data.route==="CODING_AGENT" && data.task_id){
      $("activityText").textContent="Coding Agent запущен — жду результат…";
      let attempts=0;
@@ -117,6 +125,7 @@ $("run").onclick=async()=>{
            $("result").textContent+="\n\nСтатус агента: COMPLETED\nRun: "+sd.run_id;
            $("status").textContent="Готово";
            if(sd.url) $("result").textContent+="\nGitHub Actions: "+sd.url;
+           if(sd.pr?.url) $("result").textContent+="\nDraft PR: "+sd.pr.url;
            return;
          }
          if(sd.status==="failed"){
