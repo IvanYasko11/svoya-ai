@@ -118,9 +118,22 @@ export default async function handler(req, res) {
 
       if (!dispatchResponse.ok) {
         const raw = await dispatchResponse.text();
-        return res.status(dispatchResponse.status).json({
+        let githubMessage = raw;
+        try {
+          const parsed = raw ? JSON.parse(raw) : {};
+          githubMessage = parsed?.message || raw;
+        } catch {}
+
+        return res.status(502).json({
           error: "GitHub не принял задачу Coding Agent.",
-          details: raw
+          github_status: dispatchResponse.status,
+          details: githubMessage,
+          hint:
+            dispatchResponse.status === 401
+              ? "GITHUB_DISPATCH_TOKEN недействителен или истёк."
+              : dispatchResponse.status === 403
+                ? "У токена GITHUB_DISPATCH_TOKEN недостаточно прав для repository_dispatch. Нужен доступ к репозиторию с правом Contents: Read and write."
+                : "Проверь GITHUB_DISPATCH_TOKEN и доступ репозитория."
         });
       }
 
