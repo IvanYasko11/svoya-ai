@@ -59,7 +59,7 @@ export default async function handler(req, res) {
 
     if (useOpenRouter) {
       headers["HTTP-Referer"] = "https://svoya-ai.vercel.app";
-      headers["X-Title"] = "СВОЯ AI";
+      headers["X-Title"] = "Svoya AI";
     }
 
     const response = await fetch(endpoint, {
