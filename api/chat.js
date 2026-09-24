@@ -90,7 +90,7 @@ async function consumeApproval({ task, token, session, dbKey }) {
       "&task_hash=eq." + encodeURIComponent(hash(task)) +
       "&session_hash=eq." + encodeURIComponent(sessionHash) +
       "&status=eq.pending&expires_at=gt." + encodeURIComponent(new Date().toISOString()) +
-      "&select=id&limit=1",
+      "&select=id,task_id&limit=1",
     {
       method: "PATCH",
       headers: {
@@ -104,7 +104,7 @@ async function consumeApproval({ task, token, session, dbKey }) {
   );
   if (!response.ok) return false;
   const rows = await response.json();
-  return Array.isArray(rows) && rows.length === 1;
+  return Array.isArray(rows) && rows.length === 1 ? rows[0].task_id : null;
 }
 
 export default async function handler(req, res) {
@@ -162,7 +162,7 @@ export default async function handler(req, res) {
     let codingApply = false;
     if (isCoding && confirmed) {
       if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение недоступно." });
-      const approvalOk = await consumeApproval({
+      const approvedTaskId = await consumeApproval({
         task,
         token: (() => {
           const cookieHeader = req.headers?.cookie || "";
@@ -172,10 +172,10 @@ export default async function handler(req, res) {
         session,
         dbKey
       });
-      if (approvalOk) {
+      if (approvedTaskId) {
         res.setHeader("Set-Cookie", "svoya_approval=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
       }
-      if (!approvalOk) {
+      if (!approvedTaskId) {
         return res.status(403).json({
           ok: false,
           requires_confirmation: true,
@@ -192,7 +192,7 @@ export default async function handler(req, res) {
       }
 
       const codingModel = process.env.CODING_AGENT_MODEL || "cohere/north-mini-code:free";
-      const taskId = crypto.randomUUID();
+      const taskId = codingApply ? approvedTaskId : crypto.randomUUID();
 
       const dispatchResponse = await fetch("https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches", {
         method: "POST",
