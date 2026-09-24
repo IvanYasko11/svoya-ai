@@ -12,7 +12,7 @@ h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;bo
 textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
 button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
 </style>
 </head>
@@ -23,7 +23,7 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="muted">Команда</div>
 <textarea id="task" placeholder=""></textarea>
 <button id="run">Запустить</button>
-<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div>
+<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
 <div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
@@ -68,8 +68,14 @@ function verifyResponse(data, task){
 $("run").onclick=async()=>{
  const task=$("task").value.trim();
  if(!task){$("result").textContent="Введите команду.";return}
- const stages=["Понимаю задачу…","Проверяю риск на сервере…","Выбираю LLM…","Отправляю запрос…","Получаю и проверяю ответ…","Формирую ответ…"];
+ const stages=["Понимаю задачу…","Проверяю риск…","Выбираю маршрут…","Отправляю запрос модели…","Получаю ответ…","Проверяю результат…"];
+ const activityMessages=["Анализирую запрос…","Проверяю безопасность…","Определяю подходящий маршрут…","Модель работает над задачей…","Проверяю полученный результат…"];
+ let stageIndex=0, progress=0;
+ const started=performance.now();
  $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
+ $("activity").classList.add("active"); $("activityText").textContent=activityMessages[0]; $("progressBar").style.width="8%";
+ const timerId=setInterval(()=>{$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
+ const activityId=setInterval(()=>{stageIndex=Math.min(stageIndex+1,activityMessages.length-1);$("activityText").textContent=activityMessages[stageIndex];progress=Math.min(progress+16,82);$("progressBar").style.width=progress+"%"},700);
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
@@ -93,15 +99,21 @@ $("run").onclick=async()=>{
    const verification=verifyResponse(data,task);
    $("verify").textContent=verification.ok?"TECHNICAL PASS — "+verification.summary:"TECHNICAL FAIL — "+verification.summary;
    if(!verification.ok) throw new Error("Ответ не прошёл техническую проверку.");
+   $("progressBar").style.width="100%"; $("activityText").textContent="Готово — ответ проверен.";
    await new Promise(r=>setTimeout(r,200));
    $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
    $("result").textContent="PASS\n\n"+data.answer+"\n\nПровайдер: "+data.provider+"\nМодель: "+data.model;
  }catch(e){
+   $("activityText").textContent="Выполнение остановлено.";
+   $("progressBar").style.width="100%";
    $("status").textContent="Ошибка";
    $("verify").textContent="FAIL";
    $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
- }finally{$("run").disabled=false}
+ }finally{
+   clearInterval(timerId);clearInterval(activityId);
+   $("run").disabled=false;
+ }
 };
 </script>
 </body>
