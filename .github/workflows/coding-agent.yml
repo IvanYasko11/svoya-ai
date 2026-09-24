@@ -1,4 +1,5 @@
 name: SVoya AI Coding Agent
+run-name: "Coding Agent • ${{ github.event.client_payload.task_id || github.run_id }}"
 
 # Vercel redeploy trigger: 2026-09-25
 
