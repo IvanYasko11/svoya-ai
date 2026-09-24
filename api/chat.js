@@ -151,7 +151,6 @@ export default async function handler(req, res) {
         intent: routing.intent,
         route: routing.route,
         confirmation_type: isCoding ? "CODING_APPLY" : risk.level,
-        approval_token: approvalToken,
         error: isCoding
           ? "Coding Agent готов выполнить задачу, но применение изменений требует отдельного подтверждения."
           : risk.level === "HIGH"
@@ -168,7 +167,7 @@ export default async function handler(req, res) {
         token: (() => {
           const cookieHeader = req.headers?.cookie || "";
           const match = cookieHeader.match(/(?:^|;\\s*)svoya_approval=([^;]+)/);
-          return match ? decodeURIComponent(match[1]) : (typeof body?.approval_token === "string" ? body.approval_token : "");
+          return match ? decodeURIComponent(match[1]) : "";
         })(),
         session,
         dbKey
