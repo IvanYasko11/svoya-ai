@@ -47,6 +47,8 @@ function classifyIntent(task) {
   return { intent: "GENERAL", route: "LLM" };
 }
 
+import crypto from "node:crypto";
+
 export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -89,6 +91,7 @@ export default async function handler(req, res) {
       }
 
       const codingModel = process.env.CODING_AGENT_MODEL || "cohere/north-mini-code:free";
+      const taskId = crypto.randomUUID();
 
       const dispatchResponse = await fetch(
         "https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches",
@@ -105,6 +108,7 @@ export default async function handler(req, res) {
             event_type: "svoya-coding-task",
             client_payload: {
               task,
+              task_id: taskId,
               model: codingModel,
               apply_changes: "false"
             }
@@ -158,6 +162,7 @@ export default async function handler(req, res) {
         route: routing.route,
         provider: "GitHub Actions + OpenCode",
         model: codingModel,
+        task_id: taskId,
         answer
       });
     }
