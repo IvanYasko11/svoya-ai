@@ -10,9 +10,10 @@
 h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;border:1px solid #33405f;border-radius:999px;font-size:13px}
 .card{margin-top:28px;background:#11182b;border:1px solid #26324d;border-radius:18px;padding:22px}
 textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
-button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer}
+button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease}
+button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.22)}
 button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.approval{display:none;margin-top:18px;border:1px solid #5b4b20;border-radius:16px;background:linear-gradient(180deg,#1b1a13,#141827);padding:18px}.approval.active{display:block}.approval-title{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.approval-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#2a2414;border:1px solid #6b5720}.approval-text{margin-top:10px;color:#c6cede;line-height:1.5}.approval-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.approval-box{padding:11px 12px;border-radius:11px;background:#0c1221;border:1px solid #28334c}.approval-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7f8ba5}.approval-value{margin-top:4px;font-weight:700}.approval-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.approve{background:#6ee7b7;color:#07130f}.preview{background:#26324d;color:#eef2ff}.cancel{background:transparent;color:#9aa6c0;border:1px solid #33405f}.approval-note{margin-top:11px;font-size:12px;color:#8995ad}@media(max-width:700px){.approval-meta{grid-template-columns:1fr}}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
 </style>
 </head>
@@ -23,7 +24,20 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="muted">Команда</div>
 <textarea id="task" placeholder=""></textarea>
 <button id="run">Запустить</button>
-<label style="display:block;margin-top:12px;color:#9aa6c0;font-size:14px"><input id="applyChanges" type="checkbox" style="margin-right:8px">Разрешить Coding Agent применить изменения (отдельная ветка + Draft PR; main не изменяется)</label>
+<div class="approval" id="approval">
+  <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
+  <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
+  <div class="approval-meta">
+    <div class="approval-box"><div class="approval-label">Риск</div><div class="approval-value" id="approvalRisk">—</div></div>
+    <div class="approval-box"><div class="approval-label">Действие</div><div class="approval-value" id="approvalAction">—</div></div>
+  </div>
+  <div class="approval-actions">
+    <button class="approve" id="approveBtn">✓ Разрешить изменения</button>
+    <button class="preview" id="previewBtn">◉ Только проверить</button>
+    <button class="cancel" id="cancelBtn">Отмена</button>
+  </div>
+  <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
+</div>
 <div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
 <div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
@@ -36,6 +50,27 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </main>
 <script>
 const $=id=>document.getElementById(id);
+let pendingTask="";
+let pendingRoute="";
+let forcedDecision=null;
+
+function hideApproval(){
+  $("approval").classList.remove("active");
+}
+
+function showApproval(data, task){
+  pendingTask=task;
+  pendingRoute=data?.route||"";
+  $("approvalRisk").textContent=data?.risk_level||"CONFIRM";
+  $("approvalAction").textContent=pendingRoute==="CODING_AGENT"?"изменение проекта через Coding Agent":"выполнение рискованного действия";
+  $("approvalText").textContent=pendingRoute==="CODING_AGENT"
+    ? "Coding Agent готов выполнить задачу. Без разрешения он не сможет применить изменения. Ты можешь разрешить безопасное применение через отдельную ветку + Draft PR или запустить только проверку без изменений."
+    : (data?.error||"Для продолжения требуется подтверждение.");
+  $("previewBtn").style.display=pendingRoute==="CODING_AGENT"?"inline-block":"none";
+  $("approval").classList.add("active");
+  $("status").textContent="Ожидаю твоего решения";
+  $("verify").textContent="WAIT — требуется подтверждение";
+}
 
 // Поле команды всегда пустое. Подсказка меняется при каждом открытии страницы.
 const examples=[
@@ -73,21 +108,29 @@ function verifyResponse(data, task){
   return {ok:passed===checks.length,summary:passed+"/"+checks.length+" технических проверок пройдено"};
 }
 
+$("approveBtn").onclick=()=>{ if(!pendingTask)return; forcedDecision="apply"; hideApproval(); $("run").click(); };
+$("previewBtn").onclick=()=>{ if(!pendingTask)return; forcedDecision="preview"; hideApproval(); $("run").click(); };
+$("cancelBtn").onclick=()=>{ forcedDecision=null; pendingTask=""; hideApproval(); $("status").textContent="Готов к запуску"; $("verify").textContent="ожидает выполнения"; };
+
 $("run").onclick=async()=>{
  const task=$("task").value.trim();
+ const decision=forcedDecision;
+ forcedDecision=null;
  if(!task){$("result").textContent="Введите команду.";return}
+ if(decision==="apply" && pendingTask && task!==pendingTask){ $("result").textContent="Задача изменилась. Подтверждение сброшено."; pendingTask=""; return; }
+ if(decision==="apply" || decision==="preview") pendingTask="";
  const stages=["Понимаю задачу…","Проверяю риск…","Выбираю маршрут…","Отправляю запрос модели…","Получаю ответ…","Проверяю результат…"];
  const activityMessages=["Анализирую запрос…","Проверяю безопасность…","Определяю подходящий маршрут…","Модель работает над задачей…","Проверяю полученный результат…"];
  let stageIndex=0, progress=0;
  const started=performance.now();
- $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
+ $("run").disabled=true;$("result").textContent="";hideApproval();$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
  $("activity").classList.add("active"); $("activityText").textContent=activityMessages[0]; $("progressBar").style.width="8%";
  const timerId=setInterval(()=>{$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
  const activityId=setInterval(()=>{stageIndex=Math.min(stageIndex+1,activityMessages.length-1);$("activityText").textContent=activityMessages[stageIndex];progress=Math.min(progress+16,82);$("progressBar").style.width=progress+"%"},700);
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,confirmed:$("applyChanges").checked})});
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,confirmed:decision==="apply",preview:decision==="preview"})});
    const data=await response.json();
 
    if(data?.risk_level){
