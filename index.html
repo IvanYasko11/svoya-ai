@@ -18,7 +18,7 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 </head>
 <body>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V0.7 • Security</div></div>
+<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.1 • Smart Router</div></div>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task">Объясни простыми словами, что такое AI-агент.</textarea>
@@ -28,7 +28,7 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
 </div>
-<div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span></div>
+<div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span><br><b>Router:</b> <span id="route">ожидает классификации</span></div>
 <div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
 <div class="result" id="result"></div>
 </section>
@@ -53,7 +53,7 @@ $("run").onclick=async()=>{
  const task=$("task").value.trim();
  if(!task){$("result").textContent="Введите команду.";return}
  const stages=["Понимаю задачу…","Проверяю риск на сервере…","Выбираю LLM…","Отправляю запрос…","Получаю и проверяю ответ…","Формирую ответ…"];
- $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";
+ $("run").disabled=true;$("result").textContent="";$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
@@ -61,7 +61,7 @@ $("run").onclick=async()=>{
    const data=await response.json();
 
    if(data?.risk_level){
-     $("risk").textContent=data.risk_level+(data.requires_confirmation?" — требуется подтверждение":" — разрешено");
+     $("risk").textContent=data.risk_level+(data.requires_confirmation?" — требуется подтверждение":" — разрешено");$("route").textContent=(data.intent||"UNKNOWN")+" → "+(data.route||"UNKNOWN");
    }
 
    if(!response.ok){
