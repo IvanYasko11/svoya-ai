@@ -92,32 +92,19 @@ async function consumeApproval({ task, token, session, dbKey }) {
       "&status=eq.pending&expires_at=gt." + encodeURIComponent(new Date().toISOString()) +
       "&select=id&limit=1",
     {
-      headers: {
-        apikey: dbKey,
-        Authorization: "Bearer " + dbKey
-      }
-    }
-  );
-  if (!response.ok) return false;
-  const rows = await response.json();
-  if (!Array.isArray(rows) || !rows[0]?.id) return false;
-
-  const update = await fetch(
-    "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals?id=eq." +
-      encodeURIComponent(rows[0].id) +
-      "&status=eq.pending",
-    {
       method: "PATCH",
       headers: {
         apikey: dbKey,
         Authorization: "Bearer " + dbKey,
         "Content-Type": "application/json",
-        Prefer: "return=minimal"
+        Prefer: "return=representation"
       },
       body: JSON.stringify({ status: "used", used_at: new Date().toISOString() })
     }
   );
-  return update.ok;
+  if (!response.ok) return false;
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length === 1;
 }
 
 export default async function handler(req, res) {
