@@ -86,6 +86,32 @@ export default async function handler(req, res) {
       ? data?.choices?.[0]?.message?.content
       : data?.output_text;
 
+    const dbKey = process.env["SUPABASE_SECRET_KEY"];
+    if (dbKey) {
+      try {
+        await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+          method: "POST",
+          headers: {
+            apikey: dbKey,
+            Authorization: "Bearer " + dbKey,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          },
+          body: JSON.stringify({
+            user_request: task,
+            language: "ru",
+            risk_level: "LOW",
+            provider: useOpenRouter ? "OpenRouter" : "OpenAI",
+            model,
+            answer: answer || "Модель не вернула текст.",
+            verification_status: "pending"
+          })
+        });
+      } catch (memoryError) {
+        console.error("Database save failed:", memoryError?.message || memoryError);
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       provider: useOpenRouter ? "OpenRouter" : "OpenAI",
