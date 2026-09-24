@@ -127,7 +127,7 @@ jobs:
 
           cat > /tmp/opencode-agent.json <<EOF
           {
-            "$schema": "https://opencode.ai/config.json",
+            "\$schema": "https://opencode.ai/config.json",
             "model": "svoya-agent/agent",
             "providers": {
               "svoya-agent": {
