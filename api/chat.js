@@ -166,7 +166,7 @@ export default async function handler(req, res) {
         task,
         token: (() => {
           const cookieHeader = req.headers?.cookie || "";
-          const match = cookieHeader.match(/(?:^|;\\s*)svoya_approval=([^;]+)/);
+          const match = cookieHeader.match(/(?:^|;\s*)svoya_approval=([^;]+)/);
           return match ? decodeURIComponent(match[1]) : "";
         })(),
         session,
