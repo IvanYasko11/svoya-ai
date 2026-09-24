@@ -104,7 +104,7 @@ jobs:
             exit 1
           fi
 
-          cat > /tmp/svoya-broker.mjs <<'NODE'
+          cat > /tmp/svoya-broker.cjs <<'NODE'
           const http = require("http");
           const key = process.env.OPENROUTER_API_KEY;
           const server = http.createServer(async (req, res) => {
@@ -133,9 +133,9 @@ jobs:
           server.listen(8786, "127.0.0.1");
           NODE
 
-          node /tmp/svoya-broker.mjs &
+          node /tmp/svoya-broker.cjs &
           BROKER_PID=$!
-          trap 'kill "$BROKER_PID" 2>/dev/null || true; rm -f /tmp/svoya-broker.mjs' EXIT
+          trap 'kill "$BROKER_PID" 2>/dev/null || true; rm -f /tmp/svoya-broker.cjs' EXIT
           sleep 1
 
           cat > /tmp/opencode-agent.json <<EOF
@@ -424,17 +424,18 @@ jobs:
               const repairConfig = JSON.stringify({
                 "$schema": "https://opencode.ai/config.json",
                 "model": "svoya-repair/repair",
-                "provider": {
+                "providers": {
                   "svoya-repair": {
-                    "npm": "@ai-sdk/openai-compatible",
                     "name": "Svoya AI Repair Broker",
-                    "options": {
+                    "package": "@opencode/ai/providers/openai-compatible",
+                    "settings": {
                       "baseURL": "http://127.0.0.1:8787/v1",
                       "apiKey": "broker-local-only"
                     },
                     "models": {
                       "repair": {
-                        "name": codingModel
+                        "name": codingModel,
+                        "modelID": codingModel
                       }
                     }
                   }
