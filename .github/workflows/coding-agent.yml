@@ -261,7 +261,53 @@ jobs:
             return result;
           }
 
+          const http = require("http");
+          const proxyPort = 8787;
+          const proxy = http.createServer(async (req, res) => {
+            if (req.method === "GET" && req.url === "/v1/models") {
+              const body = JSON.stringify({ object: "list", data: [{ id: "repair", object: "model", owned_by: "svoya-ai" }] });
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(body);
+              return;
+            }
+            if (req.method !== "POST" || req.url !== "/v1/chat/completions") {
+              res.writeHead(404);
+              res.end();
+              return;
+            }
+            let body = "";
+            req.setEncoding("utf8");
+            req.on("data", chunk => { body += chunk; });
+            req.on("end", async () => {
+              try {
+                const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": "Bearer " + key,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://svoya-ai.vercel.app",
+                    "X-Title": "Svoya AI Repair Broker"
+                  },
+                  body
+                });
+                const text = await upstream.text();
+                res.writeHead(upstream.status, {
+                  "Content-Type": upstream.headers.get("content-type") || "application/json"
+                });
+                res.end(text);
+              } catch (error) {
+                res.writeHead(502, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: { message: "LLM broker failure" } }));
+              }
+            });
+          });
+
           (async () => {
+            await new Promise((resolve, reject) => {
+              proxy.once("error", reject);
+              proxy.listen(proxyPort, "127.0.0.1", resolve);
+            });
+
             for (let attempt = 1; attempt <= 3; attempt++) {
               const diff = candidateDiff();
               safetyCheck(diff);
@@ -296,19 +342,44 @@ jobs:
               ].join("\n");
 
               console.log("Starting bounded repair attempt " + (attempt + 1) + "/3...");
+              const repairConfig = JSON.stringify({
+                "$schema": "https://opencode.ai/config.json",
+                "model": "svoya-repair/repair",
+                "provider": {
+                  "svoya-repair": {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "Svoya AI Repair Broker",
+                    "options": {
+                      "baseURL": "http://127.0.0.1:8787/v1",
+                      "apiKey": "broker-local-only"
+                    },
+                    "models": {
+                      "repair": {
+                        "name": codingModel
+                      }
+                    }
+                  }
+                }
+              });
+
+              const repairEnv = { ...process.env, OPENCODE_CONFIG_CONTENT: repairConfig };
+              delete repairEnv.OPENROUTER_API_KEY;
+
               execFileSync("opencode", [
-                "run", "--standalone", "--model", "openrouter/" + codingModel,
+                "run", "--standalone", "--model", "svoya-repair/repair",
                 "--format", "default", repairPrompt
               ], {
                 encoding: "utf8",
                 stdio: "inherit",
-                env: process.env,
+                env: repairEnv,
                 timeout: 8 * 60 * 1000
               });
             }
           })().catch(error => {
             console.error("Repair loop failed:", error.message);
             process.exit(1);
+          }).finally(() => {
+            proxy.close();
           });
           NODE
 
