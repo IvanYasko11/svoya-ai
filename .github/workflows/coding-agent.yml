@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Read task
         id: task
@@ -113,6 +113,15 @@ jobs:
           fi
 
           echo "CODING AGENT VERIFIER: PASS — repository changes detected."
+
+          # Safety guard: the agent never receives repository write credentials.
+          # Push credentials are attached only after the agent has finished.
+          # Reject obvious secret leakage before any commit is created.
+          if git diff --binary | grep -Eqi '(OPENROUTER_API_KEY|OPENAI_API_KEY|GITHUB_DISPATCH_TOKEN|SUPABASE_SECRET_KEY|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})'; then
+            echo "::error::Potential secret detected in agent diff. Refusing to commit."
+            exit 1
+          fi
+
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Create safe commit
@@ -120,6 +129,10 @@ jobs:
         run: |
           git config user.name "SVoya AI Coding Agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Write access exists only in this post-agent step.
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/IvanYasko11/svoya-ai.git"
+
           git add -A
           git diff --cached --check
           git commit -m "feat(ai): apply coding agent task"
