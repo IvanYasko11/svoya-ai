@@ -151,6 +151,7 @@ export default async function handler(req, res) {
       if (isCoding) {
         const taskId = crypto.randomUUID();
         approvalToken = await createApproval({ task, taskId, session, dbKey });
+        res.setHeader("Set-Cookie", "svoya_approval=" + encodeURIComponent(approvalToken) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600");
       }
 
       return res.status(409).json({
@@ -174,10 +175,17 @@ export default async function handler(req, res) {
       if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение недоступно." });
       const approvalOk = await consumeApproval({
         task,
-        token: typeof body?.approval_token === "string" ? body.approval_token : "",
+        token: (() => {
+          const cookieHeader = req.headers?.cookie || "";
+          const match = cookieHeader.match(/(?:^|;\\s*)svoya_approval=([^;]+)/);
+          return match ? decodeURIComponent(match[1]) : (typeof body?.approval_token === "string" ? body.approval_token : "");
+        })(),
         session,
         dbKey
       });
+      if (approvalOk) {
+        res.setHeader("Set-Cookie", "svoya_approval=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
+      }
       if (!approvalOk) {
         return res.status(403).json({
           ok: false,
