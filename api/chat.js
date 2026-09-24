@@ -66,8 +66,11 @@ export default async function handler(req, res) {
     if (task.length > 12000) return res.status(400).json({ error: "Команда слишком длинная." });
 
     const risk = classifyRisk(task);
+    const routing = classifyIntent(task);
+    const confirmed = body?.confirmed === true;
+    const codingApply = routing.route === "CODING_AGENT" && confirmed;
 
-    if (risk.requiresConfirmation) {
+    if (risk.requiresConfirmation && !codingApply && routing.route !== "CODING_AGENT") {
       return res.status(409).json({
         ok: false,
         risk_level: risk.level,
@@ -78,8 +81,6 @@ export default async function handler(req, res) {
             : "Команда относится к действиям среднего риска. Сначала требуется явное подтверждение перед выполнением."
       });
     }
-
-    const routing = classifyIntent(task);
 
     if (routing.route === "CODING_AGENT") {
       const githubToken = process.env.GITHUB_DISPATCH_TOKEN;
@@ -110,7 +111,7 @@ export default async function handler(req, res) {
               task,
               task_id: taskId,
               model: codingModel,
-              apply_changes: "false"
+              apply_changes: codingApply ? "true" : "false"
             }
           })
         }
@@ -137,7 +138,9 @@ export default async function handler(req, res) {
         });
       }
 
-      const answer = "Coding Agent подключён. Задача принята и поставлена в очередь GitHub Actions. Изменения в репозиторий не применяются без отдельного подтверждения.";
+      const answer = codingApply
+        ? "Coding Agent запущен с подтверждением. Изменения будут применены только в изолированную ветку и оформлены в Draft PR. В main ничего не сливается автоматически."
+        : "Coding Agent подключён. Задача поставлена в безопасный preview-режим. Изменения в репозиторий не применяются. Чтобы разрешить применение, повторите задачу с отдельным подтверждением.";
 
       const dbKey = process.env["SUPABASE_SECRET_KEY"];
       if (dbKey) {
@@ -170,7 +173,9 @@ export default async function handler(req, res) {
       return res.status(202).json({
         ok: true,
         risk_level: risk.level,
-        requires_confirmation: false,
+        requires_confirmation: risk.requiresConfirmation && !confirmed,
+        apply_changes: codingApply,
+        preview: !codingApply,
         intent: routing.intent,
         route: routing.route,
         provider: "GitHub Actions + OpenCode",
