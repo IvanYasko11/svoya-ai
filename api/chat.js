@@ -70,12 +70,12 @@ function parseGithubWrite(task) {
   if (branchMatch && /(создай|создать|create|нов)/i.test(text) && !fileMatch) {
     return { action: "create_branch", input: { repository: "IvanYasko11/svoya-ai", branch: branchMatch[1], base_ref: "main" } };
   }
-  if (fileMatch && contentMatch) {
+  if (fileMatch && contentMatch && branchMatch) {
     return {
       action: "create_or_update_file",
       input: {
         repository: "IvanYasko11/svoya-ai",
-        branch: branchMatch?.[1] || "ai/tool-pending",
+        branch: branchMatch[1],
         path: fileMatch[1],
         content: contentMatch[1],
         message: "SVOYA AI safe write"
