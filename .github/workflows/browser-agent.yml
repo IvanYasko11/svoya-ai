@@ -20,17 +20,21 @@ jobs:
         env:
           BROWSER_ACTION: ${{ github.event.client_payload.action }}
           BROWSER_URL: ${{ github.event.client_payload.url }}
+          BROWSER_TASK_ID: ${{ github.event.client_payload.task_id }}
           BROWSER_ALLOWED_HOSTS: ${{ vars.BROWSER_ALLOWED_HOSTS }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           node - <<'NODE'
           const { validateBrowserTarget } = require("./lib/browser-tool.cjs");
           (async () => {
             const action = process.env.BROWSER_ACTION;
             const raw = process.env.BROWSER_URL;
-            const allowed = process.env.BROWSER_ALLOWED_HOSTS;
+            const taskId = process.env.BROWSER_TASK_ID;
             if (!["open","extract_text"].includes(action)) throw new Error("Unsupported browser action");
-            if (!allowed) throw new Error("BROWSER_ALLOWED_HOSTS is not configured.");
-            await validateBrowserTarget(raw, allowed);
+            if (!/^[A-Za-z0-9_-]{8,100}$/.test(taskId || "")) throw new Error("Invalid browser task id");
+            if (!process.env.BROWSER_ALLOWED_HOSTS) throw new Error("BROWSER_ALLOWED_HOSTS is not configured.");
+            if (!process.env.SUPABASE_SECRET_KEY) throw new Error("SUPABASE_SECRET_KEY is not configured in GitHub Actions.");
+            await validateBrowserTarget(raw, process.env.BROWSER_ALLOWED_HOSTS);
             console.log("Browser payload validated.");
           })().catch((error) => { console.error(error.message); process.exit(1); });
           NODE
@@ -38,41 +42,73 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Execute browser action
+      - name: Execute and persist browser result
         env:
           BROWSER_ACTION: ${{ github.event.client_payload.action }}
           BROWSER_URL: ${{ github.event.client_payload.url }}
+          BROWSER_TASK_ID: ${{ github.event.client_payload.task_id }}
           BROWSER_ALLOWED_HOSTS: ${{ vars.BROWSER_ALLOWED_HOSTS }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           node - <<'NODE'
           const { chromium } = require("playwright");
           const { validateBrowserTarget, isAllowedHost } = require("./lib/browser-tool.cjs");
-          (async () => {
-            const allowed = process.env.BROWSER_ALLOWED_HOSTS;
-            if (!allowed) throw new Error("BROWSER_ALLOWED_HOSTS is not configured.");
-            const browser = await chromium.launch({ headless: true });
-            const context = await browser.newContext();
-            const page = await context.newPage();
-            await page.route("**/*", async (route) => {
-              try {
-                await validateBrowserTarget(route.request().url(), allowed);
-                await route.continue();
-              } catch {
-                await route.abort("blockedbyclient");
-              }
+          const SUPABASE_URL = "https://wmyvdrxsqrntkxurzgps.supabase.co";
+          const headers = {
+            apikey: process.env.SUPABASE_SECRET_KEY,
+            Authorization: "Bearer " + process.env.SUPABASE_SECRET_KEY,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          };
+          async function update(status, fields = {}) {
+            const q = "task_id=eq." + encodeURIComponent(process.env.BROWSER_TASK_ID);
+            const response = await fetch(SUPABASE_URL + "/rest/v1/browser_jobs?" + q, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({ status, ...fields })
             });
-            await validateBrowserTarget(process.env.BROWSER_URL, allowed);
-            await page.goto(process.env.BROWSER_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
-            const finalUrl = page.url();
-            if (!isAllowedHost(new URL(finalUrl).hostname, allowed)) throw new Error("Final browser URL is not allowlisted.");
-            const title = await page.title();
-            const text = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
-            console.log(JSON.stringify({
-              action: process.env.BROWSER_ACTION,
-              url: finalUrl,
-              title,
-              text: String(text).slice(0, 50000)
-            }));
-            await browser.close();
+            if (!response.ok) throw new Error("Supabase browser job update failed: " + response.status);
+          }
+          (async () => {
+            await update("running", { started_at: new Date().toISOString() });
+            let browser;
+            try {
+              browser = await chromium.launch({ headless: true });
+              const context = await browser.newContext();
+              const page = await context.newPage();
+              const allowed = process.env.BROWSER_ALLOWED_HOSTS;
+              await page.route("**/*", async (route) => {
+                try {
+                  const raw = route.request().url();
+                  if (!/^https?:/i.test(raw)) throw new Error("Non-http request blocked");
+                  await validateBrowserTarget(raw, allowed);
+                  await route.continue();
+                } catch {
+                  await route.abort("blockedbyclient");
+                }
+              });
+              await validateBrowserTarget(process.env.BROWSER_URL, allowed);
+              await page.goto(process.env.BROWSER_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+              const finalUrl = page.url();
+              await validateBrowserTarget(finalUrl, allowed);
+              if (!isAllowedHost(new URL(finalUrl).hostname, allowed)) throw new Error("Final browser URL is not allowlisted.");
+              const title = await page.title();
+              const text = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
+              await update("succeeded", {
+                final_url: finalUrl,
+                title,
+                text: String(text).slice(0, 50000),
+                completed_at: new Date().toISOString()
+              });
+              console.log(JSON.stringify({ action: process.env.BROWSER_ACTION, task_id: process.env.BROWSER_TASK_ID, url: finalUrl, title }));
+            } catch (error) {
+              await update("failed", {
+                error: String(error?.message || error).slice(0, 4000),
+                completed_at: new Date().toISOString()
+              }).catch(() => {});
+              throw error;
+            } finally {
+              if (browser) await browser.close().catch(() => {});
+            }
           })().catch((error) => { console.error(error); process.exit(1); });
           NODE
