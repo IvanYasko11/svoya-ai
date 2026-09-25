@@ -20,15 +20,19 @@ jobs:
         env:
           BROWSER_ACTION: ${{ github.event.client_payload.action }}
           BROWSER_URL: ${{ github.event.client_payload.url }}
+          BROWSER_ALLOWED_HOSTS: ${{ vars.BROWSER_ALLOWED_HOSTS }}
         run: |
           node - <<'NODE'
-          const action = process.env.BROWSER_ACTION;
-          const raw = process.env.BROWSER_URL;
-          if (!["open","extract_text"].includes(action)) throw new Error("Unsupported browser action");
-          const u = new URL(raw);
-          if (!["http:","https:"].includes(u.protocol)) throw new Error("Unsupported URL scheme");
-          if (u.username || u.password) throw new Error("Credential-bearing URL blocked");
-          console.log("Browser payload validated:", action, u.origin);
+          const { validateBrowserTarget } = require("./lib/browser-tool.cjs");
+          (async () => {
+            const action = process.env.BROWSER_ACTION;
+            const raw = process.env.BROWSER_URL;
+            const allowed = process.env.BROWSER_ALLOWED_HOSTS;
+            if (!["open","extract_text"].includes(action)) throw new Error("Unsupported browser action");
+            if (!allowed) throw new Error("BROWSER_ALLOWED_HOSTS is not configured.");
+            await validateBrowserTarget(raw, allowed);
+            console.log("Browser payload validated.");
+          })().catch((error) => { console.error(error.message); process.exit(1); });
           NODE
       - name: Install Playwright
         run: |
@@ -38,19 +42,34 @@ jobs:
         env:
           BROWSER_ACTION: ${{ github.event.client_payload.action }}
           BROWSER_URL: ${{ github.event.client_payload.url }}
+          BROWSER_ALLOWED_HOSTS: ${{ vars.BROWSER_ALLOWED_HOSTS }}
         run: |
           node - <<'NODE'
           const { chromium } = require("playwright");
+          const { validateBrowserTarget, isAllowedHost } = require("./lib/browser-tool.cjs");
           (async () => {
+            const allowed = process.env.BROWSER_ALLOWED_HOSTS;
+            if (!allowed) throw new Error("BROWSER_ALLOWED_HOSTS is not configured.");
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext();
             const page = await context.newPage();
+            await page.route("**/*", async (route) => {
+              try {
+                await validateBrowserTarget(route.request().url(), allowed);
+                await route.continue();
+              } catch {
+                await route.abort("blockedbyclient");
+              }
+            });
+            await validateBrowserTarget(process.env.BROWSER_URL, allowed);
             await page.goto(process.env.BROWSER_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+            const finalUrl = page.url();
+            if (!isAllowedHost(new URL(finalUrl).hostname, allowed)) throw new Error("Final browser URL is not allowlisted.");
             const title = await page.title();
             const text = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
             console.log(JSON.stringify({
               action: process.env.BROWSER_ACTION,
-              url: page.url(),
+              url: finalUrl,
               title,
               text: String(text).slice(0, 50000)
             }));
