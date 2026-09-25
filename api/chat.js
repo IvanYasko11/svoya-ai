@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { buildPlan } from "../lib/planner.js";
 import { selectTools } from "../lib/tools.js";
+import { executeTool } from "../lib/tool-executor.cjs";
 
 const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
@@ -40,6 +41,9 @@ function classifyIntent(task) {
   const text = task.toLowerCase();
   if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
     return { intent: "CODING", route: "CODING_AGENT" };
+  }
+  if (/(github|репозитор|readme|коммит|ветк|pull request|файл в github)/i.test(text)) {
+    return { intent: "GITHUB_TOOL", route: "GITHUB_TOOL" };
   }
   if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
     return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
@@ -193,6 +197,66 @@ export default async function handler(req, res) {
         });
       }
       codingApply = true;
+    }
+
+    if (routing.route === "GITHUB_TOOL") {
+      if (risk.level !== "LOW") {
+        return res.status(409).json({
+          ok: false,
+          requires_confirmation: true,
+          risk_level: risk.level,
+          intent: routing.intent,
+          route: routing.route,
+          error: "GitHub action requires explicit confirmation because the request is not read-only."
+        });
+      }
+
+      const githubToolToken = process.env.GITHUB_TOOL_TOKEN;
+      if (!githubToolToken) {
+        return res.status(503).json({
+          ok: false,
+          intent: routing.intent,
+          route: routing.route,
+          plan,
+          tools,
+          error: "GitHub Tool Executor wired but GITHUB_TOOL_TOKEN is not configured."
+        });
+      }
+
+      const match = task.match(/(?:прочитай|покажи|открой|прочесть|содержимое).*?(?:файл|file)?\s*([A-Za-z0-9_.\/-]+)?/i);
+      const requestedPath = (match?.[1] || "").replace(/^\/+/, "");
+      if (!requestedPath) {
+        return res.status(400).json({
+          ok: false,
+          intent: routing.intent,
+          route: routing.route,
+          error: "Для GitHub read нужен путь к файлу, например README.md."
+        });
+      }
+
+      const result = await executeTool({
+        tool: "github_read",
+        action: "read_file",
+        input: { repository: "IvanYasko11/svoya-ai", path: requestedPath }
+      });
+
+      return res.status(200).json({
+        ok: true,
+        risk_level: risk.level,
+        requires_confirmation: false,
+        intent: routing.intent,
+        route: routing.route,
+        plan,
+        tools,
+        provider: "GitHub Tool Executor",
+        model: null,
+        answer: result.content,
+        tool_result: {
+          repository: result.repository,
+          path: result.path,
+          sha: result.sha
+        }
+      });
     }
 
     if (routing.route === "CODING_AGENT") {

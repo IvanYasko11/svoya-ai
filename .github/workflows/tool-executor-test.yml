@@ -1,0 +1,25 @@
+name: tool-executor-test
+
+on:
+  push:
+    branches:
+      - "ai/v1.8.1-github-tool-executor"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/tool-executor.test.cjs
+      - run: node --check api/chat.js
+      - run: node --check api/tool.js
+      - run: node --check lib/tool-executor.cjs
