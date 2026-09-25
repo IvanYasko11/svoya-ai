@@ -439,7 +439,7 @@ jobs:
 
               if (process.env.SELF_TEST === "true") {
                 console.log("SELF-TEST: deterministic repair path — no LLM repair agent.");
-                fs.writeFileSync("REPAIR_LOOP_TEST.md", "SVOYA_REPAIR_LOOP_OK\\n");
+                fs.writeFileSync("REPAIR_LOOP_TEST.md", "SVOYA_REPAIR_LOOP_OK\n");
                 continue;
               }
 
