@@ -28,7 +28,7 @@ const fakeFetch = async (url, options) => {
     fetchImpl: fakeFetch
   });
   assert.equal(result.content, "SVOYA_TOOL_OK");
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.match(calls[0].options.headers.Authorization, /^Bearer /);
 
   await assert.rejects(
