@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "ai/v1.8.1-github-tool-executor"
+      - "ai/v1.8.2-safe-write-executor"
   pull_request:
     branches:
       - main
