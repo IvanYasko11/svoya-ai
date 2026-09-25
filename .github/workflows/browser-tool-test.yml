@@ -21,4 +21,5 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/browser-tool.test.cjs
+      - run: node scripts/browser-dispatch.test.cjs
       - run: node --check lib/browser-tool.cjs
