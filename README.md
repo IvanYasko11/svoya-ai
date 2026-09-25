@@ -4,7 +4,7 @@
 
 ## Текущий этап
 
-V1.8.2 — Tool Layer + approval-gated GitHub Safe Write.
+V1.9 — Tool Layer + approval-gated GitHub Safe Write + guarded Playwright Browser.
 
 ### Реально работает
 
