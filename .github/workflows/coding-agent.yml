@@ -259,6 +259,7 @@ jobs:
           VERIFIER_MODEL: ${{ vars.SEMANTIC_VERIFIER_MODEL || 'openrouter/free' }}
           CODING_TASK: ${{ steps.task.outputs.task }}
           CODING_MODEL: ${{ steps.task.outputs.model }}
+          SELF_TEST: ${{ steps.task.outputs.self_test }}
         run: |
           if [ -z "$OPENROUTER_API_KEY" ] || [ -z "$VERIFIER_MODEL" ]; then
             echo "::error::Semantic verifier configuration is incomplete. Failing closed."
