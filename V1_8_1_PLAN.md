@@ -1,0 +1,1 @@
+# V1.8.1 GitHub Tool Executor\n\nRead-only by default; writes require Safe Apply approval.\n
