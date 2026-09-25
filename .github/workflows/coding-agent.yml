@@ -6,6 +6,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       task:
@@ -62,6 +64,11 @@ jobs:
           MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
           APPLY="${DISPATCH_APPLY:-${INPUT_APPLY:-false}}"
           SELF_TEST="${INPUT_SELF_TEST:-false}"
+
+          # Temporary one-run self-test trigger; remove after runtime verification.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            SELF_TEST="true"
+          fi
 
           if [ "$SELF_TEST" = "true" ]; then
             TASK="Create REPAIR_LOOP_TEST.md with exactly one line: SVOYA_REPAIR_LOOP_OK"
