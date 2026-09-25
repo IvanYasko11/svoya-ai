@@ -48,9 +48,6 @@ function classifyIntent(task) {
   if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
     return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
   }
-  if (/(github|репозитор|readme|коммит|ветк|pull request|файл в github)/i.test(text)) {
-    return { intent: "GITHUB_TOOL", route: "GITHUB_TOOL" };
-  }
   if (/(сейчас|сегодня|последн|актуаль|новост|цена|курс|погода|интернет|исследуй|research)/i.test(text)) {
     return { intent: "WEB_RESEARCH", route: "WEB_RESEARCH" };
   }
