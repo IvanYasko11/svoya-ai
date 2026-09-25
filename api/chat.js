@@ -8,6 +8,7 @@ const { requestWithFallback } = require("../scripts/provider-router.cjs");
 const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
 const { normalizeUrl, isAllowedHost, verifyBrowserResult } = require("../lib/browser-tool.cjs");
 const { buildUntrustedBrowserContext } = require("../lib/browser-content.cjs");
+const { classifyBrowserJob, buildBrowserResult } = require("../lib/browser-result.cjs");
 
 import crypto from "node:crypto";
 
@@ -225,19 +226,35 @@ export default async function handler(req, res) {
     const rows = await response.json();
     if (!rows.length) return res.status(404).json({ error: "Browser task not found." });
     const job = rows[0];
-    const verification = job.status === "succeeded"
-      ? verifyBrowserResult({
-          action: job.action,
-          finalUrl: job.final_url,
-          title: job.title,
-          text: job.text,
-          allowedHosts: process.env.BROWSER_ALLOWED_HOSTS
-        })
-      : { status: job.status === "failed" ? "FAIL" : "PENDING", reason: job.error || "Browser job is not complete." };
+    const verification = classifyBrowserJob({
+      job,
+      allowedHosts: process.env.BROWSER_ALLOWED_HOSTS,
+      verify: verifyBrowserResult
+    });
+    if (verification.status === "EXPIRED" && job.status !== "expired") {
+      await updateBrowserJob({
+        taskId,
+        status: "expired",
+        fields: {
+          error: verification.reason,
+          verification_status: "FAIL",
+          verification_reason: verification.reason,
+          completed_at: new Date().toISOString()
+        },
+        dbKey,
+        session
+      }).catch(() => {});
+      job.status = "expired";
+      job.error = verification.reason;
+    }
     const browserContext = job.status === "succeeded"
       ? buildUntrustedBrowserContext({ url: job.final_url, title: job.title, text: job.text })
       : null;
-    return res.status(200).json({ ok: true, browser_job: job, verification, browser_context: browserContext });
+    return res.status(200).json({
+      ok: true,
+      browser_job: job,
+      result: buildBrowserResult({ job, verification, browserContext })
+    });
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
