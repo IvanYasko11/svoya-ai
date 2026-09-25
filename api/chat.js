@@ -6,7 +6,7 @@ import { executeTool } from "../lib/tool-executor.cjs";
 const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
 const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
-const { normalizeUrl, isAllowedHost } = require("../lib/browser-tool.cjs");
+const { normalizeUrl, isAllowedHost, verifyBrowserResult } = require("../lib/browser-tool.cjs");
 
 import crypto from "node:crypto";
 
@@ -217,13 +217,23 @@ export default async function handler(req, res) {
     const response = await fetch(
       "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/browser_jobs?task_id=eq." +
       encodeURIComponent(taskId) + "&session_hash=eq." + encodeURIComponent(hash(session)) +
-      "&select=id,task_id,status,action,requested_url,final_url,title,text,error,created_at,started_at,completed_at,expires_at&limit=1",
+      "&select=id,task_id,status,action,requested_url,final_url,title,text,error,verification_status,verification_reason,created_at,started_at,completed_at,expires_at&limit=1",
       { headers: { apikey: dbKey, Authorization: "Bearer " + dbKey } }
     );
     if (!response.ok) return res.status(502).json({ error: "Не удалось получить browser job." });
     const rows = await response.json();
     if (!rows.length) return res.status(404).json({ error: "Browser task not found." });
-    return res.status(200).json({ ok: true, browser_job: rows[0] });
+    const job = rows[0];
+    const verification = job.status === "succeeded"
+      ? verifyBrowserResult({
+          action: job.action,
+          finalUrl: job.final_url,
+          title: job.title,
+          text: job.text,
+          allowedHosts: process.env.BROWSER_ALLOWED_HOSTS
+        })
+      : { status: job.status === "failed" ? "FAIL" : "PENDING", reason: job.error || "Browser job is not complete." };
+    return res.status(200).json({ ok: true, browser_job: job, verification });
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
