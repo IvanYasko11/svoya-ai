@@ -52,7 +52,7 @@ jobs:
         run: |
           node - <<'NODE'
           const { chromium } = require("playwright");
-          const { validateBrowserTarget, isAllowedHost } = require("./lib/browser-tool.cjs");
+          const { validateBrowserTarget, isAllowedHost, verifyBrowserResult } = require("./lib/browser-tool.cjs");
           const SUPABASE_URL = "https://wmyvdrxsqrntkxurzgps.supabase.co";
           const headers = {
             apikey: process.env.SUPABASE_SECRET_KEY,
@@ -94,10 +94,20 @@ jobs:
               if (!isAllowedHost(new URL(finalUrl).hostname, allowed)) throw new Error("Final browser URL is not allowlisted.");
               const title = await page.title();
               const text = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
+              const limitedText = String(text).slice(0, 50000);
+              const verification = verifyBrowserResult({
+                action: process.env.BROWSER_ACTION,
+                finalUrl,
+                title,
+                text: limitedText,
+                allowedHosts: allowed
+              });
               await update("succeeded", {
                 final_url: finalUrl,
                 title,
-                text: String(text).slice(0, 50000),
+                text: limitedText,
+                verification_status: verification.status,
+                verification_reason: verification.reason,
                 completed_at: new Date().toISOString()
               });
               console.log(JSON.stringify({ action: process.env.BROWSER_ACTION, task_id: process.env.BROWSER_TASK_ID, url: finalUrl, title }));
