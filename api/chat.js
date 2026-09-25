@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { buildPlan } from "../lib/planner.js";
+import { selectTools } from "../lib/tools.js";
 
 const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
@@ -129,6 +130,7 @@ export default async function handler(req, res) {
     const risk = classifyRisk(task);
     const routing = classifyIntent(task);
     const plan = buildPlan(task, routing, risk);
+    const tools = selectTools({ route: routing.route, riskLevel: risk.level });
     const confirmed = body?.confirmed === true;
     const preview = body?.preview === true;
     const isCoding = routing.route === "CODING_AGENT";
@@ -258,6 +260,7 @@ export default async function handler(req, res) {
               language: "ru",
               risk_level: risk.level,
               plan,
+              tools,
               selected_tool: routing.route,
               provider: "GitHub Actions + OpenCode",
               model: codingModel,
@@ -279,6 +282,7 @@ export default async function handler(req, res) {
         intent: routing.intent,
         route: routing.route,
         plan,
+        tools,
         provider: "GitHub Actions + OpenCode",
         model: codingModel,
         task_id: taskId,
