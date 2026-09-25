@@ -186,8 +186,9 @@ export default async function handler(req, res) {
     const confirmed = body?.confirmed === true;
     const preview = body?.preview === true;
     const isCoding = routing.route === "CODING_AGENT";
+    const browserTask = routing.route === "BROWSER_TOOL";
     const githubWrite = classifyGithubWrite(task);
-    const approvalCapable = isCoding || githubWrite;
+    const approvalCapable = isCoding || githubWrite || browserTask;
     const needsApproval = approvalCapable || risk.requiresConfirmation;
     const dbKey = process.env.SUPABASE_SECRET_KEY;
     const session = getSession(req, res);
