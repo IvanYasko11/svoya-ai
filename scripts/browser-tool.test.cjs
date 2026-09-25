@@ -28,6 +28,8 @@ assert.equal(isPrivateIp("8.8.8.8"), false);
     browserImpl: async ({ url }) => ({ title: "Example", text: "BROWSER_TOOL_OK", url })
   });
   assert.equal(result.text, "BROWSER_TOOL_OK");
-  assert.equal(result.title, "Example");\n  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: result.url, title: result.title, text: result.text, allowedHosts: "example.com" }).status, "PASS");\n  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: "https://example.com/", title: "Example", text: "", allowedHosts: "example.com" }).status, "FAIL");
+  assert.equal(result.title, "Example");
+  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: result.url, title: result.title, text: result.text, allowedHosts: "example.com" }).status, "PASS");
+  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: "https://example.com/", title: "Example", text: "", allowedHosts: "example.com" }).status, "FAIL");
   console.log("SVOYA_BROWSER_TOOL_OK");
 })();
