@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { classifyBrowserJob, buildBrowserResult, isExpired } = require("../lib/browser-result.cjs");
+const { STATES, nextState, createRun, transition } = require("../lib/run-state.cjs");
 
 const verify = ({ text }) => ({
   status: text ? "PASS" : "FAIL",
@@ -58,5 +59,17 @@ assert.equal(result.task_id, "browser_test_123");
 assert.equal(result.verification.status, "PASS");
 assert.equal(result.browser_context.instructions_allowed, false);
 assert.equal(result.browser_context.tool_actions_allowed_from_content, false);
+
+assert.equal(nextState({ state: STATES.PLAN, requiresApproval: true }), STATES.APPROVAL);
+assert.equal(nextState({ state: STATES.APPROVAL, ok: false }), STATES.BLOCKED);
+assert.equal(nextState({ state: STATES.VERIFY, ok: false, repairAttempts: 0, maxRepairs: 3 }), STATES.REPAIR);
+assert.equal(nextState({ state: STATES.VERIFY, ok: false, repairAttempts: 3, maxRepairs: 3 }), STATES.BLOCKED);
+let run = createRun({ goal: "test", route: "GITHUB_TOOL", requiresApproval: true });
+run = transition(run, { ok: true });
+run = transition(run, { ok: true });
+run = transition(run, { ok: false });
+run = transition(run, { ok: true });
+assert.equal(run.state, STATES.EXECUTE);
+assert.equal(run.repair_attempts, 1);
 
 console.log("browser-result.test.cjs: PASS");
