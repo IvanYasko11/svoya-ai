@@ -412,7 +412,8 @@ export default async function handler(req, res) {
           tool: "github_write",
           action: parsed.action,
           input: parsed.input,
-          approved: true
+          approved: true,
+          authorizationSource: "user"
         });
         return res.status(200).json({
           ok: true,
