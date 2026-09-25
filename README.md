@@ -94,4 +94,4 @@ Browser results are treated as untrusted external data. The result API exposes a
 
 ## Следующий gate
 
-V1.10 — Result Poller + Verifier for browser jobs. After that: R10 browser-to-tool trust-boundary tests, then V2.0 Genius Autopilot.
+V1.10 — Result Poller + Verifier for browser jobs. Polling now has an explicit state machine (queued/running/succeeded/failed/expired), TTL handling, deterministic verification, and a stable result envelope. After that: R10 browser-to-tool trust-boundary tests, then V2.0 Genius Autopilot.
