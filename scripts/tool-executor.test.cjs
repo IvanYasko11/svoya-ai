@@ -51,7 +51,8 @@ const fakeFetch = async (url, options) => {
     input: { repository: "IvanYasko11/svoya-ai", branch: "ai/tool-test" },
     env: { GITHUB_WRITE_TOKEN: "test-token", GITHUB_TOOL_TOKEN: "read-token" },
     fetchImpl: fakeFetch,
-    approved: true
+    approved: true,
+    authorizationSource: "user"
   });
   assert.equal(branchResult.base_sha, "base-sha");
 
@@ -61,7 +62,8 @@ const fakeFetch = async (url, options) => {
     input: { repository: "IvanYasko11/svoya-ai", branch: "ai/tool-test", path: "test.txt", content: "SAFE_WRITE_OK", message: "test safe write" },
     env: { GITHUB_WRITE_TOKEN: "test-token", GITHUB_TOOL_TOKEN: "read-token" },
     fetchImpl: fakeFetch,
-    approved: true
+    approved: true,
+    authorizationSource: "user"
   });
   assert.equal(fileResult.action, "created");
 
@@ -71,9 +73,23 @@ const fakeFetch = async (url, options) => {
     input: { repository: "IvanYasko11/svoya-ai", head_branch: "ai/tool-test", title: "Safe write test", body: "test" },
     env: { GITHUB_WRITE_TOKEN: "test-token" },
     fetchImpl: fakeFetch,
-    approved: true
+    approved: true,
+    authorizationSource: "user"
   });
   assert.equal(prResult.draft, true);
+
+  await assert.rejects(
+    executeTool({
+      tool: "github_write",
+      action: "create_branch",
+      input: { repository: "IvanYasko11/svoya-ai", branch: "ai/tool-test" },
+      env: { GITHUB_WRITE_TOKEN: "test-token" },
+      fetchImpl: fakeFetch,
+      approved: true,
+      authorizationSource: "browser"
+    }),
+    /user-originated approval/
+  );
 
   assert.ok(calls.some((c) => c.options?.headers?.Authorization === "Bearer test-token"));
   console.log("SVOYA_TOOL_EXECUTOR_OK");
