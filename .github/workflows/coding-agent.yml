@@ -44,6 +44,10 @@ jobs:
       - uses: actions/checkout@v5
       - name: Provider Router unit tests
         run: node scripts/provider-router.test.cjs
+      - name: Operator module syntax/import check
+        run: |
+          node --check api/chat.js
+          node --input-type=module -e "import(\"./api/chat.js\").then(()=>console.log(\"api/chat import: PASS\"))"
 
   coding-agent:
     if: github.event_name != 'push'
