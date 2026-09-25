@@ -54,6 +54,49 @@ function classifyIntent(task) {
   return { intent: "GENERAL", route: "LLM" };
 }
 
+function classifyGithubWrite(task) {
+  const text = task.toLowerCase();
+  if (!/(github|репозитор|ветк|pull request|pr|файл)/i.test(text)) return false;
+  return /(создай.*ветк|создать.*ветк|нов.*ветк|create.*branch|создай.*файл|создать.*файл|измени.*файл|обнови.*файл|create.*file|update.*file|draft.*pr|чернов.*pull request|создай.*pull request)/i.test(text);
+}
+
+function parseGithubWrite(task) {
+  const text = task.trim();
+  const branchMatch = text.match(/(?:ветк[ау]|branch)\s+(?:с\s+именем\s+)?([A-Za-z0-9._/-]+)/i);
+  const fileMatch = text.match(/(?:файл|file)\s+([A-Za-z0-9_.\/-]+)/i);
+  const contentMatch = text.match(/(?:содержимым|content)\s*[:=]\s*([\s\S]+)$/i);
+  const titleMatch = text.match(/(?:название|title)\s*[:=]\s*([^\n]+)/i);
+  const bodyMatch = text.match(/(?:описание|body)\s*[:=]\s*([\s\S]+)$/i);
+  if (branchMatch && /(создай|создать|create|нов)/i.test(text) && !fileMatch) {
+    return { action: "create_branch", input: { repository: "IvanYasko11/svoya-ai", branch: branchMatch[1], base_ref: "main" } };
+  }
+  if (fileMatch && contentMatch) {
+    return {
+      action: "create_or_update_file",
+      input: {
+        repository: "IvanYasko11/svoya-ai",
+        branch: branchMatch?.[1] || "ai/tool-pending",
+        path: fileMatch[1],
+        content: contentMatch[1],
+        message: "SVOYA AI safe write"
+      }
+    };
+  }
+  if (/(draft.*pr|чернов.*pull request|создай.*pull request)/i.test(text) && branchMatch) {
+    return {
+      action: "create_draft_pr",
+      input: {
+        repository: "IvanYasko11/svoya-ai",
+        head_branch: branchMatch[1],
+        base: "main",
+        title: titleMatch?.[1]?.trim() || "СВОЯ AI safe write",
+        body: bodyMatch?.[1]?.trim() || "Draft PR created by approved СВОЯ AI tool execution."
+      }
+    };
+  }
+  return null;
+}
+
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
@@ -138,7 +181,9 @@ export default async function handler(req, res) {
     const confirmed = body?.confirmed === true;
     const preview = body?.preview === true;
     const isCoding = routing.route === "CODING_AGENT";
-    const needsApproval = isCoding || risk.requiresConfirmation;
+    const githubWrite = classifyGithubWrite(task);
+    const approvalCapable = isCoding || githubWrite;
+    const needsApproval = approvalCapable || risk.requiresConfirmation;
     const dbKey = process.env.SUPABASE_SECRET_KEY;
     const session = getSession(req, res);
 
@@ -148,7 +193,8 @@ export default async function handler(req, res) {
       }
 
       let approvalToken = null;
-      if (isCoding) {
+      if (approvalCapable) {
+        if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение временно недоступно: SUPABASE_SECRET_KEY не настроен." });
         const taskId = crypto.randomUUID();
         approvalToken = await createApproval({ task, taskId, session, dbKey });
         res.setHeader("Set-Cookie", [
@@ -163,18 +209,21 @@ export default async function handler(req, res) {
         requires_confirmation: true,
         intent: routing.intent,
         route: routing.route,
-        confirmation_type: isCoding ? "CODING_APPLY" : risk.level,
+        confirmation_type: isCoding ? "CODING_APPLY" : githubWrite ? "GITHUB_WRITE" : risk.level,
         error: isCoding
           ? "Coding Agent готов выполнить задачу, но применение изменений требует отдельного подтверждения."
-          : risk.level === "HIGH"
+          : githubWrite
+            ? "GitHub Safe Write подготовлен, но запись требует отдельного подтверждения."
+            : risk.level === "HIGH"
             ? "Команда относится к действиям высокого риска. Требуется явное подтверждение непосредственно перед выполнением."
             : "Команда относится к действиям среднего риска. Требуется явное подтверждение непосредственно перед выполнением."
       });
     }
 
     let codingApply = false;
+    let githubWriteApproved = false;
     let approvedTaskId = null;
-    if (isCoding && confirmed) {
+    if (approvalCapable && confirmed) {
       if (!dbKey) return res.status(503).json({ error: "Безопасное подтверждение недоступно." });
       approvedTaskId = await consumeApproval({
         task,
@@ -196,10 +245,55 @@ export default async function handler(req, res) {
           error: "Подтверждение недействительно, уже использовано или истекло. Запроси новое разрешение."
         });
       }
-      codingApply = true;
+      if (isCoding) codingApply = true;
+      if (githubWrite) githubWriteApproved = true;
+    } else if (confirmed && risk.requiresConfirmation) {
+      return res.status(403).json({
+        ok: false,
+        requires_confirmation: true,
+        error: "Это действие требует отдельного подтверждения через поддерживаемый безопасный workflow."
+      });
     }
 
     if (routing.route === "GITHUB_TOOL") {
+      if (githubWrite) {
+        if (!githubWriteApproved) {
+          return res.status(403).json({ ok: false, requires_confirmation: true, error: "GitHub write approval is required." });
+        }
+        const githubWriteToken = process.env.GITHUB_WRITE_TOKEN;
+        if (!githubWriteToken) {
+          return res.status(503).json({ ok: false, intent: routing.intent, route: routing.route, error: "GitHub Safe Write Executor requires GITHUB_WRITE_TOKEN." });
+        }
+        const parsed = parseGithubWrite(task);
+        if (!parsed) {
+          return res.status(400).json({
+            ok: false,
+            intent: routing.intent,
+            route: routing.route,
+            error: "Не удалось безопасно разобрать GitHub write-команду. Для файла используй формат: «создай файл path в ветке ai/tool-name с содержимым: ...»."
+          });
+        }
+        const result = await executeTool({
+          tool: "github_write",
+          action: parsed.action,
+          input: parsed.input,
+          approved: true
+        });
+        return res.status(200).json({
+          ok: true,
+          risk_level: risk.level,
+          requires_confirmation: false,
+          intent: routing.intent,
+          route: routing.route,
+          plan,
+          tools,
+          provider: "GitHub Safe Write Executor",
+          model: null,
+          answer: "GitHub write выполнен в разрешённом контуре.",
+          tool_result: result
+        });
+      }
+
       if (risk.level !== "LOW") {
         return res.status(409).json({
           ok: false,
