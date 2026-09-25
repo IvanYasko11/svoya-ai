@@ -4,13 +4,13 @@
 
 ## Текущий этап
 
-V1.7 — Provider Router + Planner.
+V1.8.2 — Tool Layer + approval-gated GitHub Safe Write.
 
 ### Реально работает
 
 - Vercel Operator/API.
 - Risk Gate HIGH/MEDIUM/LOW и подтверждение для опасных действий.
-- Smart Router: GENERAL / WEB_RESEARCH / FILE_ANALYSIS / CODING_AGENT.
+- Smart Router: GENERAL / WEB_RESEARCH / FILE_ANALYSIS / CODING_AGENT / GITHUB_TOOL.
 - Coding Agent через GitHub Actions + OpenCode.
 - Safe Apply: изолированная ветка и Draft PR; main автоматически не сливается.
 - Semantic Verifier и bounded Repair Loop до 3 попыток.
