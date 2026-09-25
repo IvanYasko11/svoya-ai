@@ -1,0 +1,59 @@
+name: browser-agent
+
+on:
+  repository_dispatch:
+    types: [svoya-browser-task]
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Validate payload
+        env:
+          BROWSER_ACTION: ${{ github.event.client_payload.action }}
+          BROWSER_URL: ${{ github.event.client_payload.url }}
+        run: |
+          node - <<'NODE'
+          const action = process.env.BROWSER_ACTION;
+          const raw = process.env.BROWSER_URL;
+          if (!["open","extract_text"].includes(action)) throw new Error("Unsupported browser action");
+          const u = new URL(raw);
+          if (!["http:","https:"].includes(u.protocol)) throw new Error("Unsupported URL scheme");
+          if (u.username || u.password) throw new Error("Credential-bearing URL blocked");
+          console.log("Browser payload validated:", action, u.origin);
+          NODE
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Execute browser action
+        env:
+          BROWSER_ACTION: ${{ github.event.client_payload.action }}
+          BROWSER_URL: ${{ github.event.client_payload.url }}
+        run: |
+          node - <<'NODE'
+          const { chromium } = require("playwright");
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            await page.goto(process.env.BROWSER_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+            const title = await page.title();
+            const text = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
+            console.log(JSON.stringify({
+              action: process.env.BROWSER_ACTION,
+              url: page.url(),
+              title,
+              text: String(text).slice(0, 50000)
+            }));
+            await browser.close();
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE
