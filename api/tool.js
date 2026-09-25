@@ -1,7 +1,7 @@
 import { executeTool } from "../lib/tool-executor.cjs";
 
-const ALLOWED_TOOLS = new Set(["github_read"]);
-const ALLOWED_ACTIONS = new Set(["read_file", "list_files", "compare_commits"]);
+const ALLOWED_TOOLS = new Set(["github_read", "github_write"]);
+const ALLOWED_ACTIONS = new Set(["read_file", "list_files", "compare_commits", "create_branch", "create_or_update_file", "create_draft_pr"]);
 const ALLOWED_REPOSITORIES = new Set(["IvanYasko11/svoya-ai"]);
 
 function parseBody(req) {
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     if (!ALLOWED_TOOLS.has(tool) || !ALLOWED_ACTIONS.has(action)) {
       return res.status(403).json({ ok: false, error: "Tool/action is not allowlisted." });
     }
-    if (input.repository !== "IvanYasko11/svoya-ai") {
+    if (!ALLOWED_REPOSITORIES.has(input.repository)) {
       return res.status(403).json({ ok: false, error: "Repository is not allowlisted for this endpoint." });
     }
 
