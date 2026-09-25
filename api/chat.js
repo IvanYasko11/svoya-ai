@@ -1,3 +1,6 @@
+import { buildPlan } from "../lib/planner.js";
+import { requestWithFallback } from "../scripts/provider-router.cjs";
+
 import crypto from "node:crypto";
 
 function classifyRisk(task) {
@@ -122,6 +125,7 @@ export default async function handler(req, res) {
 
     const risk = classifyRisk(task);
     const routing = classifyIntent(task);
+    const plan = buildPlan(task, routing, risk);
     const confirmed = body?.confirmed === true;
     const preview = body?.preview === true;
     const isCoding = routing.route === "CODING_AGENT";
@@ -250,6 +254,7 @@ export default async function handler(req, res) {
               intent: routing.intent,
               language: "ru",
               risk_level: risk.level,
+              plan,
               selected_tool: routing.route,
               provider: "GitHub Actions + OpenCode",
               model: codingModel,
@@ -270,6 +275,7 @@ export default async function handler(req, res) {
         preview: !codingApply,
         intent: routing.intent,
         route: routing.route,
+        plan,
         provider: "GitHub Actions + OpenCode",
         model: codingModel,
         task_id: taskId,
@@ -277,51 +283,33 @@ export default async function handler(req, res) {
       });
     }
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    const openAIKey = process.env.OPENAI_API_KEY;
-    if (!openRouterKey && !openAIKey) {
-      return res.status(503).json({ error: "Не настроен API-провайдер. Добавь OPENROUTER_API_KEY в Vercel → Environment Variables." });
+    const preferredModel = process.env.SVOYA_OPERATOR_MODEL || process.env.OPENROUTER_MODEL || "openrouter/free";
+    const providerResult = await requestWithFallback({
+      model: preferredModel,
+      messages: [
+        {
+          role: "system",
+          content: "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. Не выдумывай факты. Если нужны актуальные данные, используй подключённый Web Research route. Будь кратким и практичным."
+        },
+        { role: "user", content: task }
+      ],
+      temperature: 0
+    });
+
+    if (!providerResult.ok) {
+      return res.status(providerResult.status).json({
+        error: providerResult.code === "ACCOUNT_QUOTA_EXHAUSTED"
+          ? "Квота текущего провайдера исчерпана, а другой настроенный провайдер не смог принять запрос."
+          : "Все настроенные LLM-провайдеры недоступны.",
+        provider: providerResult.provider,
+        model: providerResult.model,
+        attempts: providerResult.attempts
+      });
     }
 
-    const useOpenRouter = Boolean(openRouterKey);
-    const apiKey = useOpenRouter ? openRouterKey : openAIKey;
-    const endpoint = useOpenRouter ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/responses";
-    const model = useOpenRouter ? (process.env.OPENROUTER_MODEL || "openrouter/free") : (process.env.OPENAI_MODEL || "gpt-5.6-luna");
-
-    const requestBody = useOpenRouter
-      ? {
-          model,
-          messages: [
-            {
-              role: "system",
-              content: "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. Будь кратким и практичным."
-            },
-            { role: "user", content: task }
-          ]
-        }
-      : {
-          model,
-          instructions: "Ты — СВОЯ AI, личный AI-оператор. Отвечай на русском языке. Не выдумывай факты. Если для ответа нужны актуальные данные, скажи, что веб-поиск ещё не подключён. Будь кратким и практичным.",
-          input: task,
-          store: false
-        };
-
-    const headers = { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" };
-    if (useOpenRouter) {
-      headers["HTTP-Referer"] = "https://svoya-ai.vercel.app";
-      headers["X-Title"] = "Svoya AI";
-    }
-
-    const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(requestBody) });
-    const raw = await response.text();
     let data = {};
-    try { data = raw ? JSON.parse(raw) : {}; } catch {}
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data?.error?.message || raw || "LLM API error." });
-    }
-
-    const answer = useOpenRouter ? data?.choices?.[0]?.message?.content : data?.output_text;
+    try { data = providerResult.text ? JSON.parse(providerResult.text) : {}; } catch {}
+    const answer = data?.choices?.[0]?.message?.content || "Модель не вернула текст.";
 
     if (dbKey) {
       try {
@@ -338,10 +326,11 @@ export default async function handler(req, res) {
             intent: routing.intent,
             language: "ru",
             risk_level: risk.level,
+            plan,
             selected_tool: routing.route,
-            provider: useOpenRouter ? "OpenRouter" : "OpenAI",
-            model,
-            answer: answer || "Модель не вернула текст.",
+            provider: providerResult.provider,
+            model: providerResult.model,
+            answer,
             verification_status: "pending"
           })
         });
@@ -356,9 +345,10 @@ export default async function handler(req, res) {
       requires_confirmation: risk.requiresConfirmation,
       intent: routing.intent,
       route: routing.route,
-      provider: useOpenRouter ? "OpenRouter" : "OpenAI",
-      model,
-      answer: answer || "Модель не вернула текст."
+      plan,
+      provider: providerResult.provider,
+      model: providerResult.model,
+      answer
     });
   } catch (error) {
     return res.status(500).json({ error: "Ошибка соединения с LLM API: " + (error?.message || "неизвестная ошибка") });
