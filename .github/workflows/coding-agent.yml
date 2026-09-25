@@ -4,6 +4,8 @@ run-name: "Coding Agent • ${{ github.event.client_payload.task_id || github.ru
 # Vercel redeploy trigger: 2026-09-25
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       task:
@@ -60,6 +62,11 @@ jobs:
           MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
           APPLY="${DISPATCH_APPLY:-${INPUT_APPLY:-false}}"
           SELF_TEST="${INPUT_SELF_TEST:-false}"
+
+          # Temporary autonomous self-test trigger: pushes to main run the deterministic Repair Loop test.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            SELF_TEST="true"
+          fi
 
           if [ "$SELF_TEST" = "true" ]; then
             TASK="Create REPAIR_LOOP_TEST.md with exactly one line: SVOYA_REPAIR_LOOP_OK"
