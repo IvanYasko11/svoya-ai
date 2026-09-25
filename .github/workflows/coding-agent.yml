@@ -29,9 +29,6 @@ on:
         type: string
   repository_dispatch:
     types: [svoya-coding-task]
-  push:
-    branches:
-      - redteam/v1.6-fallback-runtime
 
 permissions:
   contents: write
@@ -67,13 +64,6 @@ jobs:
           SELF_TEST="${INPUT_SELF_TEST:-false}"
           AI_REPAIR_TEST="false"
 
-          if [ "${{ github.event_name }}" = "push" ]; then
-            AI_REPAIR_TEST="true"
-            TASK="Repair REPAIR_LOOP_TEST.md so it contains exactly one line: SVOYA_REPAIR_LOOP_OK. Do not modify any other file. Do not commit or push."
-            MODEL="cohere/north-mini-code:free"
-            APPLY="false"
-          fi
-
           if [ "$SELF_TEST" = "true" ]; then
             TASK="Create REPAIR_LOOP_TEST.md with exactly one line: SVOYA_REPAIR_LOOP_OK"
             APPLY="false"
@@ -93,11 +83,6 @@ jobs:
           echo "ai_repair_test=$AI_REPAIR_TEST" >> "$GITHUB_OUTPUT"
           TASK_ID="${DISPATCH_TASK_ID:-${{ github.run_id }}}"
           echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare AI Repair Red Team fixture
-        if: steps.task.outputs.ai_repair_test == 'true'
-        run: |
-          printf '%s\n' 'SVOYA_REPAIR_LOOP_BROKEN' > REPAIR_LOOP_TEST.md
 
       - name: Install OpenCode
         if: steps.task.outputs.self_test != 'true'
