@@ -87,3 +87,11 @@ V1.8 — Tool Layer. Первый шаг реализован: allowlisted capab
 
 Старый Unity-проект IvanYasko11/emocional_game не трогать.
 \n\n### Следующий этап\n\n- Result Poller + Verifier for browser jobs.\n- Treat webpage content as untrusted input before any LLM reasoning.\n- Then V2.0 Genius Autopilot: broader tool selection, bounded execution, verification and repair.\n
+
+## V1.9-R9 — Web Prompt Injection
+
+Browser results are treated as untrusted external data. The result API exposes an explicit `UNTRUSTED_EXTERNAL_CONTENT` context with `instructions_allowed=false` and `tool_actions_allowed_from_content=false`. Common prompt-injection patterns are detected for downstream verification. Webpage text is never an authorization source for tool actions.
+
+## Следующий gate
+
+V1.10 — Result Poller + Verifier for browser jobs. After that: R10 browser-to-tool trust-boundary tests, then V2.0 Genius Autopilot.
