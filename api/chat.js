@@ -215,7 +215,7 @@ export default async function handler(req, res) {
         requires_confirmation: true,
         intent: routing.intent,
         route: routing.route,
-        confirmation_type: isCoding ? "CODING_APPLY" : githubWrite ? "GITHUB_WRITE" : risk.level,
+        confirmation_type: isCoding ? "CODING_APPLY" : githubWrite ? "GITHUB_WRITE" : browserTask ? "BROWSER_ACTION" : risk.level,
         error: isCoding
           ? "Coding Agent готов выполнить задачу, но применение изменений требует отдельного подтверждения."
           : githubWrite
