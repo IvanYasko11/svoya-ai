@@ -5,6 +5,7 @@ on:
     branches:
       - "ai/v1.8.2-safe-write-executor"
       - "ai/v1.9-browser-tool"
+      - "ai/v1.9-r9-prompt-injection"
   pull_request:
     branches:
       - main
@@ -22,4 +23,5 @@ jobs:
           node-version: 22
       - run: node scripts/browser-tool.test.cjs
       - run: node scripts/browser-dispatch.test.cjs
+      - run: node scripts/browser-content.test.cjs
       - run: node --check lib/browser-tool.cjs
