@@ -112,11 +112,6 @@ jobs:
           CODING_MODEL: ${{ steps.task.outputs.model }}
           SELF_TEST: ${{ steps.task.outputs.self_test }}
         run: |
-          if [ -z "$OPENROUTER_API_KEY" ]; then
-            echo "::error::GitHub secret OPENROUTER_API_KEY is not configured."
-            exit 1
-          fi
-
           if [ -z "$OPENROUTER_API_KEY$GROQ_API_KEY$GEMINI_API_KEY$MISTRAL_API_KEY" ]; then
             echo "::error::No LLM provider key is configured."
             exit 1
@@ -250,7 +245,7 @@ jobs:
           CODING_MODEL: ${{ steps.task.outputs.model }}
           SELF_TEST: ${{ steps.task.outputs.self_test }}
         run: |
-          if [ -z "$OPENROUTER_API_KEY" ] || [ -z "$VERIFIER_MODEL" ]; then
+          if [ -z "$OPENROUTER_API_KEY$GROQ_API_KEY$GEMINI_API_KEY$MISTRAL_API_KEY" ] || [ -z "$VERIFIER_MODEL" ]; then
             echo "::error::Semantic verifier configuration is incomplete. Failing closed."
             exit 1
           fi
@@ -428,6 +423,9 @@ jobs:
 
               const repairEnv = { ...process.env, OPENCODE_CONFIG_CONTENT: repairConfig };
               delete repairEnv.OPENROUTER_API_KEY;
+              delete repairEnv.GROQ_API_KEY;
+              delete repairEnv.GEMINI_API_KEY;
+              delete repairEnv.MISTRAL_API_KEY;
 
               execFileSync("opencode", [
                 "run", "--standalone", "--model", "svoya-repair/repair",
