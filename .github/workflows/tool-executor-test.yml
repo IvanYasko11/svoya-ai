@@ -20,3 +20,6 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/tool-executor.test.cjs
+      - run: node --check api/chat.js
+      - run: node --check api/tool.js
+      - run: node --check lib/tool-executor.cjs
