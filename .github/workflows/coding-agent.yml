@@ -114,6 +114,29 @@ jobs:
           cat > /tmp/svoya-broker.cjs <<'NODE'
           const http = require("http");
           const key = process.env.OPENROUTER_API_KEY;
+          const FREE_FALLBACKS = [
+            "qwen/qwen3.8-27b:free",
+            "openrouter/free"
+          ];
+          const RETRYABLE = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+
+          async function callModel(model, body) {
+            const payload = JSON.parse(body);
+            payload.model = model;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 90000);
+            try {
+              return await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method:"POST",
+                headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://svoya-ai.vercel.app","X-Title":"Svoya AI Agent Broker"},
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+
           const server = http.createServer(async (req, res) => {
             if (req.method === "GET" && req.url === "/v1/models") {
               res.writeHead(200, {"Content-Type":"application/json"});
@@ -126,15 +149,33 @@ jobs:
             req.on("data", chunk => body += chunk);
             req.on("end", async () => {
               try {
-                const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                  method:"POST",
-                  headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json","HTTP-Referer":"https://svoya-ai.vercel.app","X-Title":"Svoya AI Agent Broker"},
-                  body
-                });
-                const out = await upstream.text();
-                res.writeHead(upstream.status, {"Content-Type":upstream.headers.get("content-type") || "application/json"});
-                res.end(out);
-              } catch { res.writeHead(502, {"Content-Type":"application/json"}); res.end(JSON.stringify({error:{message:"LLM broker failure"}})); }
+                const requested = JSON.parse(body).model;
+                const models = [requested, ...FREE_FALLBACKS].filter((m, i, a) => m && a.indexOf(m) === i);
+                let lastStatus = 502;
+                let lastText = JSON.stringify({error:{message:"LLM broker failure"}});
+                for (const model of models) {
+                  try {
+                    const upstream = await callModel(model, body);
+                    const out = await upstream.text();
+                    lastStatus = upstream.status;
+                    lastText = out;
+                    if (upstream.ok || !RETRYABLE.has(upstream.status)) {
+                      if (model !== requested) console.log("SVoya AI Agent Broker: fallback model used: " + model);
+                      res.writeHead(upstream.status, {"Content-Type":upstream.headers.get("content-type") || "application/json"});
+                      res.end(out);
+                      return;
+                    }
+                    console.log("SVoya AI Agent Broker: model unavailable (" + upstream.status + "), trying fallback.");
+                  } catch (error) {
+                    console.log("SVoya AI Agent Broker: model request failed, trying fallback.");
+                  }
+                }
+                res.writeHead(lastStatus, {"Content-Type":"application/json"});
+                res.end(lastText);
+              } catch {
+                res.writeHead(400, {"Content-Type":"application/json"});
+                res.end(JSON.stringify({error:{message:"Invalid broker request"}}));
+              }
             });
           });
           server.listen(8786, "127.0.0.1");
@@ -365,6 +406,34 @@ jobs:
 
           const http = require("http");
           const proxyPort = 8787;
+          const FREE_FALLBACKS = [
+            "qwen/qwen3.8-27b:free",
+            "openrouter/free"
+          ];
+          const RETRYABLE = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+
+          async function callRepairModel(model, body) {
+            const payload = JSON.parse(body);
+            payload.model = model;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 90000);
+            try {
+              return await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  "Authorization": "Bearer " + key,
+                  "Content-Type": "application/json",
+                  "HTTP-Referer": "https://svoya-ai.vercel.app",
+                  "X-Title": "Svoya AI Repair Broker"
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+
           const proxy = http.createServer(async (req, res) => {
             if (req.method === "GET" && req.url === "/v1/models") {
               const body = JSON.stringify({ object: "list", data: [{ id: "repair", object: "model", owned_by: "svoya-ai" }] });
@@ -382,24 +451,34 @@ jobs:
             req.on("data", chunk => { body += chunk; });
             req.on("end", async () => {
               try {
-                const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                  method: "POST",
-                  headers: {
-                    "Authorization": "Bearer " + key,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://svoya-ai.vercel.app",
-                    "X-Title": "Svoya AI Repair Broker"
-                  },
-                  body
-                });
-                const text = await upstream.text();
-                res.writeHead(upstream.status, {
-                  "Content-Type": upstream.headers.get("content-type") || "application/json"
-                });
-                res.end(text);
-              } catch (error) {
-                res.writeHead(502, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: { message: "LLM broker failure" } }));
+                const requested = JSON.parse(body).model;
+                const models = [requested, ...FREE_FALLBACKS].filter((m, i, a) => m && a.indexOf(m) === i);
+                let lastStatus = 502;
+                let lastText = JSON.stringify({error:{message:"LLM broker failure"}});
+                for (const model of models) {
+                  try {
+                    const upstream = await callRepairModel(model, body);
+                    const text = await upstream.text();
+                    lastStatus = upstream.status;
+                    lastText = text;
+                    if (upstream.ok || !RETRYABLE.has(upstream.status)) {
+                      if (model !== requested) console.log("SVoya AI Repair Broker: fallback model used: " + model);
+                      res.writeHead(upstream.status, {
+                        "Content-Type": upstream.headers.get("content-type") || "application/json"
+                      });
+                      res.end(text);
+                      return;
+                    }
+                    console.log("SVoya AI Repair Broker: model unavailable (" + upstream.status + "), trying fallback.");
+                  } catch (error) {
+                    console.log("SVoya AI Repair Broker: model request failed, trying fallback.");
+                  }
+                }
+                res.writeHead(lastStatus, { "Content-Type": "application/json" });
+                res.end(lastText);
+              } catch {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: { message: "Invalid broker request" } }));
               }
             });
           });
