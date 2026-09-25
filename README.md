@@ -4,13 +4,13 @@
 
 ## Текущий этап
 
-V1.7 — Provider Router + Planner.
+V1.9-R — Browser Tool hardened: approval binding, SSRF/DNS guards, redirect/request checks, session-bound result persistence.
 
 ### Реально работает
 
 - Vercel Operator/API.
 - Risk Gate HIGH/MEDIUM/LOW и подтверждение для опасных действий.
-- Smart Router: GENERAL / WEB_RESEARCH / FILE_ANALYSIS / CODING_AGENT.
+- Smart Router: GENERAL / WEB_RESEARCH / FILE_ANALYSIS / CODING_AGENT / GITHUB_TOOL.
 - Coding Agent через GitHub Actions + OpenCode.
 - Safe Apply: изолированная ветка и Draft PR; main автоматически не сливается.
 - Semantic Verifier и bounded Repair Loop до 3 попыток.
@@ -86,3 +86,12 @@ V1.8 — Tool Layer. Первый шаг реализован: allowlisted capab
 Следующий gate V1.8: подключить реальный GitHub MCP/connector execution adapter с read-only по умолчанию, а write-действия — только после существующего approval flow. Не подключать произвольные MCP-серверы и не давать агенту универсальный доступ.
 
 Старый Unity-проект IvanYasko11/emocional_game не трогать.
+\n\n### Следующий этап\n\n- Result Poller + Verifier for browser jobs.\n- Treat webpage content as untrusted input before any LLM reasoning.\n- Then V2.0 Genius Autopilot: broader tool selection, bounded execution, verification and repair.\n
+
+## V1.9-R9 — Web Prompt Injection
+
+Browser results are treated as untrusted external data. The result API exposes an explicit `UNTRUSTED_EXTERNAL_CONTENT` context with `instructions_allowed=false` and `tool_actions_allowed_from_content=false`. Common prompt-injection patterns are detected for downstream verification. Webpage text is never an authorization source for tool actions.
+
+## Следующий gate
+
+V1.10 — Result Poller + Verifier for browser jobs. Polling now has an explicit state machine (queued/running/succeeded/failed/expired), TTL handling, deterministic verification, and a stable result envelope. After that: R10 browser-to-tool trust-boundary tests, then V2.0 Genius Autopilot.
