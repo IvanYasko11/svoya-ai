@@ -1,7 +1,7 @@
 import { executeTool } from "../lib/tool-executor.cjs";
 
-const ALLOWED_TOOLS = new Set(["github_read", "github_write"]);
-const ALLOWED_ACTIONS = new Set(["read_file", "list_files", "compare_commits", "create_branch", "create_or_update_file", "create_draft_pr"]);
+const ALLOWED_TOOLS = new Set(["github_read"]);
+const ALLOWED_ACTIONS = new Set(["read_file", "list_files", "compare_commits"]);
 const ALLOWED_REPOSITORIES = new Set(["IvanYasko11/svoya-ai"]);
 
 function parseBody(req) {
