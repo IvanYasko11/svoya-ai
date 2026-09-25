@@ -5,6 +5,7 @@ import { executeTool } from "../lib/tool-executor.cjs";
 
 const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
+const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
 
 import crypto from "node:crypto";
 
@@ -41,6 +42,9 @@ function classifyIntent(task) {
   const text = task.toLowerCase();
   if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
     return { intent: "CODING", route: "CODING_AGENT" };
+  }
+  if (/(браузер|browser|сайт|website|открой сайт|перейди на)/i.test(text)) {
+    return { intent: "BROWSER", route: "BROWSER_TOOL" };
   }
   if (/(github|репозитор|readme|коммит|ветк|pull request|файл в github)/i.test(text)) {
     return { intent: "GITHUB_TOOL", route: "GITHUB_TOOL" };
@@ -252,6 +256,31 @@ export default async function handler(req, res) {
         ok: false,
         requires_confirmation: true,
         error: "Это действие требует отдельного подтверждения через поддерживаемый безопасный workflow."
+      });
+    }
+
+    if (routing.route === "BROWSER_TOOL") {
+      if (!browserTask) return res.status(400).json({ ok: false, error: "Invalid browser task." });
+      if (!confirmed || !approvedTaskId) return res.status(403).json({ ok: false, requires_confirmation: true, error: "Browser action requires explicit approval." });
+      const urlMatch = task.match(/https?:\\/\\/[^\\s"'<>]+/i);
+      if (!urlMatch) return res.status(400).json({ ok: false, error: "Для browser-задачи нужен явный http(s) URL." });
+      const url = urlMatch[0].replace(/[),.;]+$/, "");
+      const action = /текст|содержим|extract/i.test(task) ? "extract_text" : "open";
+      const taskId = crypto.randomBytes(12).toString("hex");
+      const dispatched = await dispatchBrowserTask({ action, url, taskId });
+      return res.status(202).json({
+        ok: true,
+        async: true,
+        task_id: taskId,
+        risk_level: risk.level,
+        requires_confirmation: false,
+        intent: routing.intent,
+        route: routing.route,
+        plan,
+        tools,
+        provider: "GitHub Actions + Playwright",
+        answer: "Browser job поставлен в очередь. Результат будет сформирован после выполнения Playwright job.",
+        browser_result: dispatched
       });
     }
 
