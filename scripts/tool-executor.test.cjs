@@ -63,7 +63,7 @@ const fakeFetch = async (url, options) => {
     fetchImpl: fakeFetch,
     approved: true
   });
-  assert.equal(fileResult.action, "updated");
+  assert.equal(fileResult.action, "created");
 
   const prResult = await executeTool({
     tool: "github_write",
