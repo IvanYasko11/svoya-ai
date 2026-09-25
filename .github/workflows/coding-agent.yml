@@ -6,6 +6,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       task:
@@ -62,6 +64,13 @@ jobs:
           MODEL="${DISPATCH_MODEL:-${INPUT_MODEL:-cohere/north-mini-code:free}}"
           APPLY="${DISPATCH_APPLY:-${INPUT_APPLY:-false}}"
           SELF_TEST="${INPUT_SELF_TEST:-false}"
+          AI_REPAIR_TEST="false"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            AI_REPAIR_TEST="true"
+            SELF_TEST="false"
+            TASK="Repair REPAIR_LOOP_TEST.md so it contains exactly one line: SVOYA_REPAIR_LOOP_OK. Do not modify any other file. Do not commit or push."
+            APPLY="false"
+          fi
 
           if [ "$SELF_TEST" = "true" ]; then
             TASK="Create REPAIR_LOOP_TEST.md with exactly one line: SVOYA_REPAIR_LOOP_OK"
@@ -79,6 +88,7 @@ jobs:
           echo "model=$MODEL" >> "$GITHUB_OUTPUT"
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
           echo "self_test=$SELF_TEST" >> "$GITHUB_OUTPUT"
+          echo "ai_repair_test=$AI_REPAIR_TEST" >> "$GITHUB_OUTPUT"
           TASK_ID="${DISPATCH_TASK_ID:-${{ github.run_id }}}"
           echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
 
@@ -96,12 +106,18 @@ jobs:
           git switch -c "$BRANCH"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare AI Repair self-test fixture
+        if: steps.task.outputs.ai_repair_test == 'true'
+        run: |
+          printf '%s\n' 'SVOYA_REPAIR_LOOP_BROKEN' > REPAIR_LOOP_TEST.md
+
       - name: Run OpenCode coding agent
         if: steps.task.outputs.self_test != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CODING_TASK: ${{ steps.task.outputs.task }}
           CODING_MODEL: ${{ steps.task.outputs.model }}
+          AI_REPAIR_TEST: ${{ steps.task.outputs.ai_repair_test }}
           SELF_TEST: ${{ steps.task.outputs.self_test }}
         run: |
           if [ -z "$OPENROUTER_API_KEY" ]; then
@@ -255,7 +271,7 @@ jobs:
 
       - name: Semantic Verifier + bounded Repair Loop
         id: semantic
-        if: steps.verify.outputs.changed == 'true'
+        if: steps.verify.outputs.changed == 'true' && steps.task.outputs.ai_repair_test != 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           VERIFIER_MODEL: ${{ vars.SEMANTIC_VERIFIER_MODEL || 'openrouter/free' }}
@@ -504,6 +520,14 @@ jobs:
             proxy.close();
           });
           NODE
+
+      - name: AI Repair self-test assertion
+        if: steps.task.outputs.ai_repair_test == 'true'
+        run: |
+          test "$(cat REPAIR_LOOP_TEST.md)" = "SVOYA_REPAIR_LOOP_OK"
+          test "$(git status --short | wc -l | tr -d ' ')" = "1"
+          test "$(git status --short | awk '{print $2}')" = "REPAIR_LOOP_TEST.md"
+          echo "AI Repair self-test assertion: PASS"
 
       - name: Deterministic self-test assertion
         if: steps.task.outputs.self_test == 'true'
