@@ -6,6 +6,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  push:
+    branches: [redteam/v1.7-provider-router]
   workflow_dispatch:
     inputs:
       task:
@@ -35,7 +37,16 @@ permissions:
   pull-requests: write
 
 jobs:
+  provider-router-test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Provider Router unit tests
+        run: node scripts/provider-router.test.cjs
+
   coding-agent:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
