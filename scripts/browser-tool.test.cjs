@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { executeBrowserTool, normalizeUrl, normalizeAction, isAllowedHost, isPrivateIp, validateBrowserTarget } = require("../lib/browser-tool.cjs");
+const { executeBrowserTool, normalizeUrl, normalizeAction, isAllowedHost, isPrivateIp, validateBrowserTarget, verifyBrowserResult } = require("../lib/browser-tool.cjs");
 
 assert.equal(normalizeUrl("https://example.com"), "https://example.com/");
 assert.throws(() => normalizeUrl("javascript:alert(1)"), /URL|Invalid/);
@@ -28,6 +28,6 @@ assert.equal(isPrivateIp("8.8.8.8"), false);
     browserImpl: async ({ url }) => ({ title: "Example", text: "BROWSER_TOOL_OK", url })
   });
   assert.equal(result.text, "BROWSER_TOOL_OK");
-  assert.equal(result.title, "Example");
+  assert.equal(result.title, "Example");\n  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: result.url, title: result.title, text: result.text, allowedHosts: "example.com" }).status, "PASS");\n  assert.equal(verifyBrowserResult({ action: "extract_text", finalUrl: "https://example.com/", title: "Example", text: "", allowedHosts: "example.com" }).status, "FAIL");
   console.log("SVOYA_BROWSER_TOOL_OK");
 })();
