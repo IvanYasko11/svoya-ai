@@ -59,7 +59,7 @@ const fakeFetch = async (url, options) => {
     tool: "github_write",
     action: "create_or_update_file",
     input: { repository: "IvanYasko11/svoya-ai", branch: "ai/tool-test", path: "test.txt", content: "SAFE_WRITE_OK", message: "test safe write" },
-    env: { GITHUB_WRITE_TOKEN: "test-token" },
+    env: { GITHUB_WRITE_TOKEN: "test-token", GITHUB_TOOL_TOKEN: "read-token" },
     fetchImpl: fakeFetch,
     approved: true
   });
