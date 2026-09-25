@@ -4,7 +4,7 @@
 
 ## Текущий этап
 
-V1.9 — Tool Layer + approval-gated GitHub Safe Write + guarded Playwright Browser.
+V1.9-R — Browser Tool hardened: approval binding, SSRF/DNS guards, redirect/request checks, session-bound result persistence.
 
 ### Реально работает
 
@@ -86,3 +86,4 @@ V1.8 — Tool Layer. Первый шаг реализован: allowlisted capab
 Следующий gate V1.8: подключить реальный GitHub MCP/connector execution adapter с read-only по умолчанию, а write-действия — только после существующего approval flow. Не подключать произвольные MCP-серверы и не давать агенту универсальный доступ.
 
 Старый Unity-проект IvanYasko11/emocional_game не трогать.
+\n\n### Следующий этап\n\n- Result Poller + Verifier for browser jobs.\n- Treat webpage content as untrusted input before any LLM reasoning.\n- Then V2.0 Genius Autopilot: broader tool selection, bounded execution, verification and repair.\n
