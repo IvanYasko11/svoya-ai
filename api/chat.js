@@ -139,6 +139,43 @@ async function createApproval({ task, taskId, session, dbKey }) {
   return token;
 }
 
+async function createBrowserJob({ taskId, action, url, session, dbKey }) {
+  const response = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/browser_jobs", {
+    method: "POST",
+    headers: {
+      apikey: dbKey,
+      Authorization: "Bearer " + dbKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({
+      id: taskId,
+      task_id: taskId,
+      status: "queued",
+      action,
+      requested_url: url,
+      session_hash: hash(session)
+    })
+  });
+  if (!response.ok) throw new Error("Не удалось создать browser job.");
+}
+
+async function updateBrowserJob({ taskId, status, fields = {}, dbKey, session }) {
+  const query = "task_id=eq." + encodeURIComponent(taskId) +
+    "&session_hash=eq." + encodeURIComponent(hash(session));
+  const response = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/browser_jobs?" + query, {
+    method: "PATCH",
+    headers: {
+      apikey: dbKey,
+      Authorization: "Bearer " + dbKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({ status, ...fields })
+  });
+  if (!response.ok) throw new Error("Не удалось обновить browser job.");
+}
+
 async function consumeApproval({ task, token, session, dbKey }) {
   if (!token || !session) return false;
   const tokenHash = hash(token);
@@ -170,6 +207,24 @@ export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+
+  if (req.method === "GET") {
+    const taskId = typeof req.query?.browser_task_id === "string" ? req.query.browser_task_id : "";
+    if (!/^[A-Za-z0-9_-]{8,100}$/.test(taskId)) return res.status(400).json({ error: "Invalid browser task id." });
+    const dbKey = process.env.SUPABASE_SECRET_KEY;
+    if (!dbKey) return res.status(503).json({ error: "Browser result storage is not configured." });
+    const session = getSession(req, res);
+    const response = await fetch(
+      "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/browser_jobs?task_id=eq." +
+      encodeURIComponent(taskId) + "&session_hash=eq." + encodeURIComponent(hash(session)) +
+      "&select=id,task_id,status,action,requested_url,final_url,title,text,error,created_at,started_at,completed_at,expires_at&limit=1",
+      { headers: { apikey: dbKey, Authorization: "Bearer " + dbKey } }
+    );
+    if (!response.ok) return res.status(502).json({ error: "Не удалось получить browser job." });
+    const rows = await response.json();
+    if (!rows.length) return res.status(404).json({ error: "Browser task not found." });
+    return res.status(200).json({ ok: true, browser_job: rows[0] });
+  }
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -272,7 +327,21 @@ export default async function handler(req, res) {
       }
       const action = /текст|содержим|extract/i.test(task) ? "extract_text" : "open";
       const taskId = crypto.randomBytes(12).toString("hex");
-      const dispatched = await dispatchBrowserTask({ action, url, taskId });
+      if (!dbKey) return res.status(503).json({ ok: false, error: "Browser result storage is not configured: SUPABASE_SECRET_KEY is required." });
+      await createBrowserJob({ taskId, action, url, session, dbKey });
+      let dispatched;
+      try {
+        dispatched = await dispatchBrowserTask({ action, url, taskId });
+      } catch (error) {
+        await updateBrowserJob({
+          taskId,
+          status: "failed",
+          fields: { error: String(error?.message || error), completed_at: new Date().toISOString() },
+          dbKey,
+          session
+        }).catch(() => {});
+        throw error;
+      }
       return res.status(202).json({
         ok: true,
         async: true,
@@ -285,7 +354,8 @@ export default async function handler(req, res) {
         tools,
         provider: "GitHub Actions + Playwright",
         answer: "Browser job поставлен в очередь. Результат будет сформирован после выполнения Playwright job.",
-        browser_result: dispatched
+        browser_result: dispatched,
+        result_url: "/api/chat?browser_task_id=" + encodeURIComponent(taskId)
       });
     }
 
