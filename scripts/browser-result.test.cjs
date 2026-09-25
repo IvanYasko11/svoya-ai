@@ -71,5 +71,6 @@ run = transition(run, { ok: false });
 run = transition(run, { ok: true });
 assert.equal(run.state, STATES.EXECUTE);
 assert.equal(run.repair_attempts, 1);
+assert.equal(nextState({ state: STATES.REPAIR, ok: true }), STATES.EXECUTE);
 
 console.log("browser-result.test.cjs: PASS");
