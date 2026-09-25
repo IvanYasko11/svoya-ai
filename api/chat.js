@@ -6,6 +6,7 @@ import { executeTool } from "../lib/tool-executor.cjs";
 const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
 const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
+const { normalizeUrl, isAllowedHost } = require("../lib/browser-tool.cjs");
 
 import crypto from "node:crypto";
 
@@ -264,7 +265,10 @@ export default async function handler(req, res) {
       if (!confirmed || !approvedTaskId) return res.status(403).json({ ok: false, requires_confirmation: true, error: "Browser action requires explicit approval." });
       const urlMatch = task.match(/https?:\\/\\/[^\\s"'<>]+/i);
       if (!urlMatch) return res.status(400).json({ ok: false, error: "Для browser-задачи нужен явный http(s) URL." });
-      const url = urlMatch[0].replace(/[),.;]+$/, "");
+      const url = normalizeUrl(urlMatch[0].replace(/[),.;]+$/, ""));
+      if (!isAllowedHost(new URL(url).hostname, process.env.BROWSER_ALLOWED_HOSTS)) {
+        return res.status(403).json({ ok: false, error: "Browser host is not allowlisted. Configure BROWSER_ALLOWED_HOSTS." });
+      }
       const action = /текст|содержим|extract/i.test(task) ? "extract_text" : "open";
       const taskId = crypto.randomBytes(12).toString("hex");
       const dispatched = await dispatchBrowserTask({ action, url, taskId });
