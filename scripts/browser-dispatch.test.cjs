@@ -10,7 +10,7 @@ const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
     env: { GITHUB_DISPATCH_TOKEN: "test-token" },
     fetchImpl: async (url, options) => {
       request = { url, options };
-      return new Response("", { status: 204 });
+      return new Response("", { status: 200 });
     }
   });
   assert.equal(result.dispatched, true);
