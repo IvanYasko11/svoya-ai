@@ -1,0 +1,31 @@
+name: browser-tool-test
+
+on:
+  push:
+    branches:
+      - "ai/v1.8.2-safe-write-executor"
+      - "ai/v1.9-browser-tool"
+      - "ai/v1.9-r9-prompt-injection"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/browser-tool.test.cjs
+      - run: node scripts/browser-dispatch.test.cjs
+      - run: node scripts/browser-content.test.cjs
+      - run: node scripts/browser-result.test.cjs
+      - run: node scripts/tool-executor.test.cjs
+      - run: node --check lib/browser-tool.cjs
+      - run: node --check lib/browser-result.cjs
+      - run: node --check api/chat.js
