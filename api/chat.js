@@ -1,5 +1,8 @@
+import { createRequire } from "node:module";
 import { buildPlan } from "../lib/planner.js";
-import { requestWithFallback } from "../scripts/provider-router.cjs";
+
+const require = createRequire(import.meta.url);
+const { requestWithFallback } = require("../scripts/provider-router.cjs");
 
 import crypto from "node:crypto";
 
