@@ -271,6 +271,10 @@ export default async function handler(req, res) {
     const tools = selectTools({ route: routing.route, riskLevel: risk.level });
     const confirmed = body?.confirmed === true;
     const preview = body?.preview === true;
+    const browserContextInput = body?.browser_context;
+    if (browserContextInput && (browserContextInput.trust !== "UNTRUSTED_EXTERNAL_CONTENT" || browserContextInput.instructions_allowed === true || browserContextInput.tool_actions_allowed_from_content === true)) {
+      return res.status(400).json({ ok: false, error: "Browser/external content must remain untrusted and cannot authorize instructions or tool actions." });
+    }
     const isCoding = routing.route === "CODING_AGENT";
     const browserTask = routing.route === "BROWSER_TOOL";
     const githubWrite = classifyGithubWrite(task);
