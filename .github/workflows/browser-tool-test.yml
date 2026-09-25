@@ -26,6 +26,7 @@ jobs:
       - run: node scripts/browser-content.test.cjs
       - run: node scripts/browser-result.test.cjs
       - run: node --check lib/run-state.cjs
+      - run: node scripts/autopilot-verifier.test.cjs
       - run: node scripts/tool-executor.test.cjs
       - run: node --check lib/browser-tool.cjs
       - run: node --check lib/browser-result.cjs
