@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const { requestWithFallback } = require("../scripts/provider-router.cjs");
 const { dispatchBrowserTask } = require("../lib/browser-dispatch.cjs");
 const { normalizeUrl, isAllowedHost, verifyBrowserResult } = require("../lib/browser-tool.cjs");
+const { buildUntrustedBrowserContext } = require("../lib/browser-content.cjs");
 
 import crypto from "node:crypto";
 
@@ -233,7 +234,10 @@ export default async function handler(req, res) {
           allowedHosts: process.env.BROWSER_ALLOWED_HOSTS
         })
       : { status: job.status === "failed" ? "FAIL" : "PENDING", reason: job.error || "Browser job is not complete." };
-    return res.status(200).json({ ok: true, browser_job: job, verification });
+    const browserContext = job.status === "succeeded"
+      ? buildUntrustedBrowserContext({ url: job.final_url, title: job.title, text: job.text })
+      : null;
+    return res.status(200).json({ ok: true, browser_job: job, verification, browser_context: browserContext });
   }
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
