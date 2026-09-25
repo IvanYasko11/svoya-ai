@@ -439,13 +439,22 @@ jobs:
               const repairConfig = JSON.stringify({
                 "$schema": "https://opencode.ai/config.json",
                 "model": "svoya-repair/repair",
+                "agents": {
+                  "build": {
+                    "steps": 3,
+                    "temperature": 0
+                  }
+                },
                 "providers": {
                   "svoya-repair": {
                     "name": "Svoya AI Repair Broker",
                     "package": "@opencode/ai/providers/openai-compatible",
                     "settings": {
                       "baseURL": "http://127.0.0.1:8787/v1",
-                      "apiKey": "broker-local-only"
+                      "apiKey": "broker-local-only",
+                      "timeout": 120000,
+                      "headerTimeout": 30000,
+                      "chunkTimeout": 30000
                     },
                     "models": {
                       "repair": {
