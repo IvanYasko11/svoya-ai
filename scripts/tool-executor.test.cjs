@@ -9,13 +9,14 @@ assert.throws(() => normalizePath("/etc/passwd"));
 let calls = [];
 const fakeFetch = async (url, options) => {
   calls.push({ url, options });
-  return new Response(JSON.stringify({
-    name: "README.md",
+  const payload = url.endsWith("/repos/IvanYasko11/svoya-ai")
+    ? { visibility: "public" }
+    : { name: "README.md",
     path: "README.md",
     sha: "abc",
     encoding: "base64",
-    content: Buffer.from("SVOYA_TOOL_OK", "utf8").toString("base64")
-  }), { status: 200 });
+    content: Buffer.from("SVOYA_TOOL_OK", "utf8").toString("base64") };
+  return new Response(JSON.stringify(payload), { status: 200 });
 };
 
 (async () => {
