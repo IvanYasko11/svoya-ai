@@ -42,6 +42,9 @@ function classifyIntent(task) {
   if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
     return { intent: "CODING", route: "CODING_AGENT" };
   }
+  if (/(github|репозитор|readme|коммит|ветк|pull request|файл в github)/i.test(text)) {
+    return { intent: "GITHUB_TOOL", route: "GITHUB_TOOL" };
+  }
   if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
     return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
   }
@@ -223,8 +226,8 @@ export default async function handler(req, res) {
         });
       }
 
-      const match = task.match(/(?:прочитай|покажи|открой|прочесть|содержимое).*?(?:файл|file)?\\s*([A-Za-z0-9_.\\/-]+)?/i);
-      const requestedPath = (match?.[1] || "").replace(/^\\/+/, "");
+      const match = task.match(/(?:прочитай|покажи|открой|прочесть|содержимое).*?(?:файл|file)?\s*([A-Za-z0-9_.\/-]+)?/i);
+      const requestedPath = (match?.[1] || "").replace(/^\/+/, "");
       if (!requestedPath) {
         return res.status(400).json({
           ok: false,
