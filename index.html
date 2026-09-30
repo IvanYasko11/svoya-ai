@@ -4,26 +4,63 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>СВОЯ AI — Operator</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:#0b1020;color:#eef2ff}
-.wrap{max-width:1000px;margin:0 auto;padding:48px 20px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}
-h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;border:1px solid #33405f;border-radius:999px;font-size:13px}
-.card{margin-top:28px;background:#11182b;border:1px solid #26324d;border-radius:18px;padding:22px}
-textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
-button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease}
-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.22)}
-button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.approval{display:none;margin-top:18px;border:1px solid #5b4b20;border-radius:16px;background:linear-gradient(180deg,#1b1a13,#141827);padding:18px}.approval.active{display:block}.approval-title{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.approval-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#2a2414;border:1px solid #6b5720}.approval-text{margin-top:10px;color:#c6cede;line-height:1.5}.approval-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.approval-box{padding:11px 12px;border-radius:11px;background:#0c1221;border:1px solid #28334c}.approval-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7f8ba5}.approval-value{margin-top:4px;font-weight:700}.approval-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.approve{background:#6ee7b7;color:#07130f}.preview{background:#26324d;color:#eef2ff}.cancel{background:transparent;color:#9aa6c0;border:1px solid #33405f}.approval-note{margin-top:11px;font-size:12px;color:#8995ad}@media(max-width:700px){.approval-meta{grid-template-columns:1fr}}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
-</style>
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<div class="ambient" aria-hidden="true"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="orb orb-three"></div></div>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.4 • Safe Apply</div></div>
-<section class="card">
-<div class="muted">Команда</div>
+<header class="top"><a class="brand" href="#home"><span class="brand-mark">S</span><span>СВОЯ AI<small>Твой личный помощник</small></span></a><nav aria-label="Основная навигация"><a href="#home">Сегодня</a><a href="#taskList">Задачи</a><a href="#assistant">Спросить ИИ</a></nav><span class="badge"><span class="dot"></span> Твоё пространство</span></header>
+<section class="welcome" id="home"><div class="eyebrow">МЕНЬШЕ СУЕТЫ · БОЛЬШЕ ЯСНОСТИ</div><h1>Всё важное.<br><span>В одном месте.</span></h1><p>Выбери следующий шаг — остальное подождёт.</p><div class="summary"><div><strong id="orgActiveCount">0</strong><span>в работе</span></div><div><strong id="orgWaitingCount">0</strong><span>ждут решения</span></div><div><strong id="orgDoneCount">0</strong><span>завершено</span></div></div></section>
+<section class="card" aria-labelledby="organizerHeading">
+<div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Твой следующий шаг</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
+<div class="command-box">
+<label for="orgCommand">Скажи, что нужно сделать с задачами</label>
+<label class="org-field command-target">К какой задаче <select id="orgTarget"><option value="">По названию в команде</option></select></label>
+<form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Разбей цель про агента на три шага"><button id="orgParse" type="submit" class="primary">Разобрать →</button></form>
+<p class="org-note">Сначала предложение, затем «Применить». Для свободной фразы нужны вход и модель: ей отправятся команда и выбранная карточка, либо список задач без архива. <a id="orgLoginLink" href="#cloud">Войти в аккаунт</a></p>
+<div id="orgPlanning" class="command-wait" hidden role="status"><span class="command-spinner" aria-hidden="true"></span><span>Готовлю предложение…</span><button id="orgStop" type="button" class="secondary">Отмена</button></div>
+<div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div>
+<div id="orgProposal" class="proposal" hidden><div id="orgProposalText"></div><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
+<p id="organizerMessage" role="status" aria-live="polite"></p>
+<p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
+<div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
+<div class="org-grid"><div id="taskList">
+<h3>Все задачи</h3>
+<label class="org-field">Поиск<input id="orgSearch" type="search" placeholder="Название или следующий шаг"></label>
+<label class="org-field">Показать<select id="organizerFilter"><option value="open">Незавершённые</option><option value="active">В работе</option><option value="waiting">Заблокированные</option><option value="deferred">Отложенные</option><option value="done">Готовые</option><option value="archived">Архив</option><option value="all">Все</option></select></label>
+<div id="organizerList"></div>
+</div><aside>
+<details id="orgEditor"><summary>Создать или изменить задачу</summary><p class="org-note">Одно понятное действие помогает двигаться вперёд.</p>
+<form id="organizerForm">
+<label class="org-field">Цель<input id="orgTitle" required maxlength="200"></label>
+<label class="org-field">Следующий конкретный шаг<textarea id="orgNext" maxlength="1000"></textarea></label>
+<label class="org-field">Что мешает<textarea id="orgBlocker" maxlength="1000"></textarea></label>
+<label class="org-field">Приоритет<select id="orgPriority"><option value="1">1 — главный</option><option value="2">2 — следующий</option><option value="3">3 — позже</option></select></label>
+<label class="org-field">Статус<select id="orgStatus"><option value="active">В работе</option><option value="waiting">Заблокировано</option><option value="deferred">Отложено</option><option value="done">Готово</option><option value="archived">Архив</option></select></label>
+<label class="org-field">Срок, если нужен<input id="orgDue" type="date"></label>
+<div class="org-actions"><button id="orgSave" type="submit">Добавить задачу</button><button id="orgCancel" type="button">Сбросить форму</button></div>
+</form></details>
+<div class="quiet-card"><span class="eyebrow">ТВОЙ ТЕМП</span><h3>Не нужно успевать всё.</h3><p>Сначала одна важная задача. Потом следующая.</p></div></aside></div>
+<details class="backup" id="cloud"><summary>Аккаунт · перенос задач между устройствами</summary>
+<p class="org-note">Сначала список сохраняется в этом браузере. После входа изменения сохраняются автоматически, когда локальный список совпадает с копией аккаунта. Если списки различаются, сначала выбери нужную копию. Вход сам по себе не меняет задачи. Для загрузки изменений с другого устройства нажми «Восстановить из аккаунта».</p>
+<form id="cloudAuth" class="cloud-auth">
+<label class="org-field">Почта<input id="cloudEmail" type="email" required autocomplete="username" maxlength="254"></label>
+<label class="org-field">Пароль<input id="cloudPassword" type="password" required minlength="8" maxlength="128" autocomplete="current-password"></label>
+<div class="org-actions"><button id="cloudLogin" type="submit" class="primary">Войти</button><button id="cloudSignup" type="button">Создать аккаунт</button></div>
+<p class="org-note">Пароль вводи только здесь. После регистрации подтверди почту. При обновлении страницы потребуется войти снова.</p>
+</form>
+<div id="cloudActions" hidden><p><label><input id="cloudAuto" type="checkbox" checked> Автосохранение после изменений</label></p><p>Аккаунт: <strong id="cloudAccount"></strong></p><div class="org-actions"><button id="cloudCheck" type="button">Проверить копию</button><button id="cloudSave" type="button" class="primary">Сохранить в аккаунте</button><button id="cloudRestore" type="button">Восстановить из аккаунта</button><button id="cloudLogout" type="button">Выйти</button></div></div>
+<p id="cloudMessage" role="status" aria-live="polite"></p>
+</details>
+<details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
+</details>
+</section>
+<section class="card assistant" id="assistant">
+<div class="eyebrow">ПОМОЩНИК</div><h2>Давай подумаем вместе</h2><label class="muted" for="task">Вопрос, идея или задача</label>
 <textarea id="task" placeholder=""></textarea>
-<button id="run">Запустить</button>
+<p class="org-note"><label><input id="orgShare" type="checkbox"> Учесть мои активные и заблокированные задачи в ответе</label><br>ИИ предложит план. Для изменения списка используй команду организатору выше.</p>
+<button id="run" class="primary">Спросить помощника →</button>
+<p class="org-note">Для ИИ нужен вход в аккаунт владельца. Coding Agent работает с публичным GitHub-проектом: его задания, отчёты и код могут быть видны другим. Личные данные туда не отправляй.</p>
 <div class="approval" id="approval">
   <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
   <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
@@ -38,21 +75,35 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
   </div>
   <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
 </div>
-<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
-<div class="steps">
+<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress" title="Индикатор ожидания. Завершение подтверждается полученным ответом."><div class="progress-bar" id="progressBar"></div></div></div>
+<details class="diagnostics"><summary>Что происходит с запросом</summary><div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
 </div>
 <div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span><br><b>Router:</b> <span id="route">ожидает классификации</span></div>
 <div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
-<div class="result" id="result"></div>
+</details><div class="result" id="result" role="status" aria-live="polite"></div>
 </section>
 </main>
+<script src="/organizer-core.js"></script>
+<script src="/organizer-proposals.js"></script>
+<script src="/organizer-ui.js"></script>
+<script src="/cloud-config.js"></script>
+<script src="/cloud-backup.js"></script>
+<script src="/cloud-ui.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let pendingTask="";
 let pendingRoute="";
 let forcedDecision=null;
+let requestGeneration=0;
+let activeChatController=null;
+window.addEventListener?.('svoya:account-changed',()=>{
+ requestGeneration++;activeChatController?.abort();activeChatController=null;
+ pendingTask='';forcedDecision=null;hideApproval();finishActivity();
+ $("run").disabled=false;$("result").textContent='';$("status").textContent='Аккаунт изменён. Отправь запрос после входа.';
+});
+function finishActivity(){ $("activity").classList.remove("active"); }
 
 function hideApproval(){
   $("approval").classList.remove("active");
@@ -74,12 +125,12 @@ function showApproval(data, task){
 
 // Поле команды всегда пустое. Подсказка меняется при каждом открытии страницы.
 const examples=[
-  "Что сейчас происходит в мире ИИ?",
+  "Помоги выбрать следующий шаг по моим задачам.",
   "Найди способ заработать первые деньги онлайн без вложений.",
   "Проверь эту идею на слабые места.",
   "Напиши простой код и объясни, как он работает.",
   "Сравни несколько вариантов и покажи различия.",
-  "Исследуй тему и дай короткий вывод.",
+  "Разложи большую задачу на три небольших шага.",
   "Помоги мне автоматизировать эту задачу.",
   "Разбери мой план в режиме Red Team."
 ];
@@ -120,24 +171,42 @@ $("run").onclick=async()=>{
  if(decision==="apply" && pendingTask && task!==pendingTask){ $("result").textContent="Задача изменилась. Подтверждение сброшено."; pendingTask=""; return; }
  if(decision==="apply" || decision==="preview") pendingTask="";
  const stages=["Понимаю задачу…","Проверяю риск…","Выбираю маршрут…","Отправляю запрос модели…","Получаю ответ…","Проверяю результат…"];
- const activityMessages=["Анализирую запрос…","Проверяю безопасность…","Определяю подходящий маршрут…","Модель работает над задачей…","Проверяю полученный результат…"];
- let stageIndex=0, progress=0;
+ 
+ let agentPending=false;
+ const generation=++requestGeneration;
+ const accountGeneration=window.getOrganizerSessionGeneration?.();
+ const controller=new AbortController();activeChatController=controller;
+ let timeout;
  const started=performance.now();
  $("run").disabled=true;$("result").textContent="";hideApproval();$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
- $("activity").classList.add("active"); $("activityText").textContent=activityMessages[0]; $("progressBar").style.width="8%";
- const timerId=setInterval(()=>{$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
- const activityId=setInterval(()=>{stageIndex=Math.min(stageIndex+1,activityMessages.length-1);$("activityText").textContent=activityMessages[stageIndex];progress=Math.min(progress+16,82);$("progressBar").style.width=progress+"%"},700);
+ $("activity").classList.add("active"); $("activityText").textContent="Отправляю запрос…"; $("progressBar").style.width="8%";
+ const timerId=setInterval(()=>{if(generation===requestGeneration)$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
+ const activityId=setInterval(()=>{
+   const elapsed=Math.max(0,performance.now()-started);
+   if(generation!==requestGeneration)return;
+   $("progressBar").style.width=(8+90*elapsed/(elapsed+45000))+"%";
+ },250);
  try{
+   let accessToken;
+   try{accessToken=window.getOrganizerAccessToken?.();if(!accessToken)throw new Error('Войди в аккаунт в разделе «Аккаунт», затем повтори запрос.');}
+   catch(e){$("cloud").open=true;throw e;}
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,confirmed:decision==="apply",preview:decision==="preview"})});
+   const organizerContext=window.getOrganizerContext();
+   $("activityText").textContent="Ожидаю ответ помощника…";
+   if(generation!==requestGeneration)return;
+   timeout=setTimeout(()=>controller.abort(),120000);
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:'Bearer '+accessToken},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"}),signal:controller.signal});
    const data=await response.json();
+   if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
+   clearInterval(activityId);
 
    if(data?.risk_level){
      $("risk").textContent=data.risk_level+(data.requires_confirmation?" — требуется подтверждение":" — разрешено");$("route").textContent=(data.intent||"UNKNOWN")+" → "+(data.route||"UNKNOWN");
    }
 
    if(!response.ok){
+     if(response.status===401){window.clearOrganizerSession?.();$("cloud").open=true;$("result").textContent=data?.error||'Сессия закончилась. Войди снова.';return;}
      if(response.status===409 && data?.requires_confirmation){
        showApproval(data,task);
        $("result").textContent="Остановлено перед потенциально опасным действием. Выбери действие выше.";
@@ -145,31 +214,38 @@ $("run").onclick=async()=>{
      }
      $("verify").textContent=data?.requires_confirmation?"BLOCK — Risk Gate":"FAIL";
      $("status").textContent=data?.requires_confirmation?"Остановлено Risk Gate":"Нужна настройка";
-     $("result").textContent=(data?.requires_confirmation?"ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ\n\n":"НЕ ГОТОВО\n\n")+(data?.error||"Ошибка API");
+     $("result").textContent=(data?.requires_confirmation?"ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ\n\n":"НЕ ГОТОВО\n\n")+(data?.error||"Ошибка API")+(data?.hint?"\n\n"+data.hint:"")+(data?.error_code?"\n\nКод: "+data.error_code:"");
      return;
    }
 
-   $("status").textContent=stages[2]; await new Promise(r=>setTimeout(r,250));
-   $("status").textContent=stages[3];
-   $("status").textContent=stages[4];
+   $("status").textContent="Проверяю ответ…";
    const verification=verifyResponse(data,task);
    $("verify").textContent=verification.ok?"TECHNICAL PASS — "+verification.summary:"TECHNICAL FAIL — "+verification.summary;
    if(!verification.ok) throw new Error("Ответ не прошёл техническую проверку.");
    $("progressBar").style.width="100%"; $("activityText").textContent="Готово — ответ проверен.";
-   await new Promise(r=>setTimeout(r,200));
-   $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
-   $("result").textContent="PASS\n\n"+data.answer+"\n\nРежим: "+(data.apply_changes?"APPLY → изолированная ветка + Draft PR":"PREVIEW → без изменений в репозитории")+"\nПровайдер: "+data.provider+"\nМодель: "+data.model;
+   $("result").textContent="Результат\n\n"+data.answer+"\n\nРежим: "+(data.apply_changes?"APPLY → изолированная ветка + Draft PR":"PREVIEW → без изменений в репозитории")+"\nПровайдер: "+data.provider+"\nМодель: "+data.model;
    if(data.route==="CODING_AGENT" && data.task_id){
+     agentPending=true;$("status").textContent="Coding Agent работает";
      $("activityText").textContent="Coding Agent запущен — жду результат…";
      let attempts=0;
      const poll=async()=>{
+       if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
        attempts++;
        try{
-         const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id));
+         let pollToken;
+         try{pollToken=window.getOrganizerAccessToken?.();if(!pollToken)throw new Error('Сессия закончилась. Войди снова.');}
+         catch(e){finishActivity();$("cloud").open=true;$("status").textContent=e.message;return;}
+         const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id),{headers:{Authorization:'Bearer '+pollToken}});
          const sd=await sr.json();
+         if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
+         if(!sr.ok){
+           if(sr.status===401){window.clearOrganizerSession?.();$("cloud").open=true;}
+           if([401,403,404].includes(sr.status)){finishActivity();$("status").textContent=sd.error||'Задача недоступна в этом аккаунте.';return;}
+           throw new Error('Статус временно недоступен.');
+         }
          if(sd.status==="completed"){
-           $("activityText").textContent="Coding Agent завершил работу.";
+           finishActivity();$("activityText").textContent="Coding Agent завершил работу.";
            $("result").textContent+="\n\nСтатус агента: COMPLETED\nRun: "+sd.run_id;
            $("status").textContent="Готово";
            if(sd.url) $("result").textContent+="\nGitHub Actions: "+sd.url;
@@ -177,7 +253,7 @@ $("run").onclick=async()=>{
            return;
          }
          if(sd.status==="failed"){
-           $("activityText").textContent="Coding Agent завершил работу с ошибкой.";
+           finishActivity();$("activityText").textContent="Coding Agent завершил работу с ошибкой.";
            $("result").textContent+="\n\nСтатус агента: FAILED\nRun: "+sd.run_id;
            $("status").textContent="Агент завершил с ошибкой";
            return;
@@ -186,24 +262,30 @@ $("run").onclick=async()=>{
            $("activityText").textContent="Coding Agent работает… попытка "+attempts+"/15";
            setTimeout(poll,2000);
          }else{
+           finishActivity();$("status").textContent="Работа продолжается в GitHub Actions";
            $("activityText").textContent="Агент продолжает работу в GitHub Actions.";
            $("result").textContent+="\n\nСтатус агента: RUNNING/QUEUED";
          }
        }catch{
+         if(generation!==requestGeneration)return;
          if(attempts<15) setTimeout(poll,2000);
+         else {finishActivity();$("status").textContent="Статус агента недоступен";}
        }
      };
      setTimeout(poll,1500);
    }
  }catch(e){
+   if(generation!==requestGeneration)return;
    $("activityText").textContent="Выполнение остановлено.";
    $("progressBar").style.width="100%";
    $("status").textContent="Ошибка";
    $("verify").textContent="FAIL";
-   $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
+   $("result").textContent="НЕ ГОТОВО\n\n"+(e.name==='AbortError'?'Запрос остановлен по времени. Повтори позже.':e.message);
  }finally{
    clearInterval(timerId);clearInterval(activityId);
-   $("run").disabled=false;
+   if(timeout)clearTimeout(timeout);
+   if(activeChatController===controller)activeChatController=null;
+   if(generation===requestGeneration){if(!agentPending)finishActivity();$("run").disabled=false;}
  }
 };
 </script>
