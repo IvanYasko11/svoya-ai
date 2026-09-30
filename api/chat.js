@@ -6,6 +6,7 @@ const { requestWithFallback } = providerRouter;
 
 import crypto from "node:crypto";
 import organizerContextModule from "../lib/organizer-context.cjs";
+import providerDiagnosticsModule from "../lib/provider-diagnostics.cjs";
 
 function classifyRisk(task) {
   const text = task.toLowerCase();
@@ -308,10 +309,9 @@ export default async function handler(req, res) {
     });
 
     if (!providerResult.ok) {
+      console.warn('SVOYA_LLM_FAILURE', JSON.stringify({code:providerResult.code,status:providerResult.status,provider:providerResult.provider,attempts:providerResult.attempts?.length||0}));
       return res.status(providerResult.status).json({
-        error: providerResult.code === "ACCOUNT_QUOTA_EXHAUSTED"
-          ? "Квота текущего провайдера исчерпана, а другой настроенный провайдер не смог принять запрос."
-          : "Все настроенные LLM-провайдеры недоступны.",
+        ...providerDiagnosticsModule.providerDiagnostics(providerResult),
         provider: providerResult.provider,
         model: providerResult.model,
         attempts: providerResult.attempts
