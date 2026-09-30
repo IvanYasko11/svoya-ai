@@ -7,7 +7,7 @@
   function accountChanged(){accountEpoch++;window.dispatchEvent?.(new Event('svoya:account-changed'));}
   window.getOrganizerSessionGeneration=()=>accountEpoch;
   window.clearOrganizerSession=()=>{accountChanged();stopTimer();cloud.clearSession();autoReady=false;baseline=undefined;render();};
-  window.getOrganizerAccessToken=()=>{try{return cloud.accessToken();}catch(e){window.clearOrganizerSession();throw e;}};
+  window.getOrganizerAccessToken=()=>{const hadSession=cloud.signedIn();try{return cloud.accessToken();}catch(e){if(hadSession)window.clearOrganizerSession();throw e;}};
   const controls=['cloudLogin','cloudSignup','cloudLogout','cloudCheck','cloudSave','cloudRestore','cloudAuto'];
   let busy=false,baseline=undefined,autoReady=false,autoSaving=false,saveTimer=null,localEpoch=0;
   function stopTimer(){if(saveTimer!==null){clearTimeout(saveTimer);saveTimer=null;}}
