@@ -15,6 +15,7 @@
 <div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Твой следующий шаг</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
 <div class="command-box"><label for="orgCommand">Скажи, что нужно сделать с задачами</label><form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Добавь задачу: разобраться с агентом"><button type="submit" class="primary">Разобрать →</button></form><div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div><div id="orgProposal" class="proposal" hidden><p id="orgProposalText"></p><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
 <p id="organizerMessage" role="status" aria-live="polite"></p>
+<p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
 <div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
 <div class="org-grid"><div id="taskList">
 <h3>Все задачи</h3>
@@ -34,15 +35,14 @@
 </form></details>
 <div class="quiet-card"><span class="eyebrow">ТВОЙ ТЕМП</span><h3>Не нужно успевать всё.</h3><p>Сначала одна важная задача. Потом следующая.</p></div></aside></div>
 <details class="backup" id="cloud"><summary>Аккаунт · перенос задач между устройствами</summary>
-<p class="org-note">Сначала список сохраняется в этом браузере. Для переноса войди и нажми «Сохранить в аккаунте». Автоматической синхронизации пока нет. Вход сам по себе не меняет задачи.</p>
+<p class="org-note">Сначала список сохраняется в этом браузере. После входа изменения сохраняются автоматически, когда локальный список совпадает с копией аккаунта. Если списки различаются, сначала выбери нужную копию. Вход сам по себе не меняет задачи. Для загрузки изменений с другого устройства нажми «Восстановить из аккаунта».</p>
 <form id="cloudAuth" class="cloud-auth">
 <label class="org-field">Почта<input id="cloudEmail" type="email" required autocomplete="username" maxlength="254"></label>
 <label class="org-field">Пароль<input id="cloudPassword" type="password" required minlength="8" maxlength="128" autocomplete="current-password"></label>
 <div class="org-actions"><button id="cloudLogin" type="submit" class="primary">Войти</button><button id="cloudSignup" type="button">Создать аккаунт</button></div>
 <p class="org-note">Пароль вводи только здесь. После регистрации подтверди почту. При обновлении страницы потребуется войти снова.</p>
 </form>
-<div id="cloudActions" hidden><p>Аккаунт: <strong id="cloudAccount"></strong></p><div class="org-actions"><button id="cloudCheck" type="button">Проверить копию</button><button id="cloudSave" type="button" class="primary">Сохранить в аккаунте</button><button id="cloudRestore" type="button">Восстановить из аккаунта</button><button id="cloudLogout" type="button">Выйти</button></div></div>
-<p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
+<div id="cloudActions" hidden><p><label><input id="cloudAuto" type="checkbox" checked> Автосохранение после изменений</label></p><p>Аккаунт: <strong id="cloudAccount"></strong></p><div class="org-actions"><button id="cloudCheck" type="button">Проверить копию</button><button id="cloudSave" type="button" class="primary">Сохранить в аккаунте</button><button id="cloudRestore" type="button">Восстановить из аккаунта</button><button id="cloudLogout" type="button">Выйти</button></div></div>
 <p id="cloudMessage" role="status" aria-live="polite"></p>
 </details>
 <details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
