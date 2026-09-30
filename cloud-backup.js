@@ -8,6 +8,10 @@
     let session=null,revision=undefined;
     const base=url.replace(/\/$/,'');
     function clear(){session=null;revision=undefined;}
+    function accessToken(){
+      if(!session||now()>=session.expires){clear();throw new Error('Для свободной команды войди в аккаунт. Если сессия закончилась, войди снова.');}
+      return session.token;
+    }
     async function request(path,{method='GET',body,authenticated=false}={}){
       if(authenticated&&(!session||now()>=session.expires)){clear();throw new Error('Сессия закончилась. Войди снова.');}
       const headers={'apikey':key,'Content-Type':'application/json'};
@@ -38,6 +42,8 @@
     }
     return {
       signedIn:()=>!!session,
+      accessToken,
+      clearSession:clear,
       async login(email,password){clear();return accept(await request('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password}}));},
       async signup(email,password){
         clear();const data=await request('/auth/v1/signup',{method:'POST',body:{email,password}});

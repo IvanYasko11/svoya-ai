@@ -41,3 +41,8 @@ test('Auth failure hides raw provider errors and clears prior account session',a
   const x=setup();x.responses.push({status:200,body:session},{status:400,body:{msg:'private provider error'}});
   await x.cloud.login('owner@example.com','password');await assert.rejects(x.cloud.login('other@example.com','wrong'),/Не удалось войти/);assert.equal(x.cloud.signedIn(),false);
 });
+test('Command requests can use the in-memory token only before expiry or logout',async()=>{
+  const x=setup();assert.throws(()=>x.cloud.accessToken(),/войди в аккаунт/);
+  x.responses.push({status:200,body:session});await x.cloud.login('owner@example.com','password');assert.equal(x.cloud.accessToken(),'private-session');
+  x.expire();assert.throws(()=>x.cloud.accessToken(),/войди снова/);assert.equal(x.cloud.signedIn(),false);
+});

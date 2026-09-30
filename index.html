@@ -13,7 +13,14 @@
 <section class="welcome" id="home"><div class="eyebrow">МЕНЬШЕ СУЕТЫ · БОЛЬШЕ ЯСНОСТИ</div><h1>Всё важное.<br><span>В одном месте.</span></h1><p>Выбери следующий шаг — остальное подождёт.</p><div class="summary"><div><strong id="orgActiveCount">0</strong><span>в работе</span></div><div><strong id="orgWaitingCount">0</strong><span>ждут решения</span></div><div><strong id="orgDoneCount">0</strong><span>завершено</span></div></div></section>
 <section class="card" aria-labelledby="organizerHeading">
 <div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Твой следующий шаг</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
-<div class="command-box"><label for="orgCommand">Скажи, что нужно сделать с задачами</label><form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Добавь задачу: разобраться с агентом"><button type="submit" class="primary">Разобрать →</button></form><div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div><div id="orgProposal" class="proposal" hidden><p id="orgProposalText"></p><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
+<div class="command-box">
+<label for="orgCommand">Скажи, что нужно сделать с задачами</label>
+<label class="org-field command-target">К какой задаче <select id="orgTarget"><option value="">По названию в команде</option></select></label>
+<form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Разбей цель про агента на три шага"><button id="orgParse" type="submit" class="primary">Разобрать →</button></form>
+<p class="org-note">Сначала предложение, затем «Применить». Для свободной фразы нужны вход и модель: ей отправятся команда и выбранная карточка, либо список задач без архива. <a id="orgLoginLink" href="#cloud">Войти в аккаунт</a></p>
+<div id="orgPlanning" class="command-wait" hidden role="status"><span class="command-spinner" aria-hidden="true"></span><span>Готовлю предложение…</span><button id="orgStop" type="button" class="secondary">Отмена</button></div>
+<div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div>
+<div id="orgProposal" class="proposal" hidden><div id="orgProposalText"></div><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
 <p id="organizerMessage" role="status" aria-live="polite"></p>
 <p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
 <div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
@@ -78,6 +85,7 @@
 </section>
 </main>
 <script src="/organizer-core.js"></script>
+<script src="/organizer-proposals.js"></script>
 <script src="/organizer-ui.js"></script>
 <script src="/cloud-config.js"></script>
 <script src="/cloud-backup.js"></script>

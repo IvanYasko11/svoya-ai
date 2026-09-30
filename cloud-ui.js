@@ -3,6 +3,8 @@
   const $=id=>document.getElementById(id);
   if(!window.SvoyaCloudConfig||!window.createCloudBackup)return;
   const cloud=window.createCloudBackup({...window.SvoyaCloudConfig,fetch:window.fetch.bind(window),validate:window.SvoyaOrganizer.validate});
+  window.clearOrganizerSession=()=>{stopTimer();cloud.clearSession();autoReady=false;baseline=undefined;render();};
+  window.getOrganizerAccessToken=()=>{try{return cloud.accessToken();}catch(e){window.clearOrganizerSession();throw e;}};
   const controls=['cloudLogin','cloudSignup','cloudLogout','cloudCheck','cloudSave','cloudRestore','cloudAuto'];
   let busy=false,baseline=undefined,autoReady=false,autoSaving=false,saveTimer=null,localEpoch=0;
   function stopTimer(){if(saveTimer!==null){clearTimeout(saveTimer);saveTimer=null;}}

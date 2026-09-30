@@ -51,7 +51,7 @@ test('Expired auth session pauses autosave and returns to the login form',async(
 });
 function setup(){
   const elements=new Map(),calls=[],events={},timers=new Map();let signed=false,allow=true,timerId=0;
-  const cloud={signedIn:()=>signed,async login(email){signed=true;calls.push('login');return email;},async read(){calls.push('read');return {state:O.seed(),revision:1};},async signup(){calls.push('signup');return false;},async write(){calls.push('write');return {revision:2};},async logout(){signed=false;calls.push('logout');}};
+  const cloud={signedIn:()=>signed,accessToken:()=>{if(!signed)throw new Error('Войди снова');return 'private-token';},clearSession:()=>{signed=false;},async login(email){signed=true;calls.push('login');return email;},async read(){calls.push('read');return {state:O.seed(),revision:1};},async signup(){calls.push('signup');return false;},async write(){calls.push('write');return {revision:2};},async logout(){signed=false;calls.push('logout');}};
   const document={getElementById(id){if(!elements.has(id))elements.set(id,{value:'',hidden:false,textContent:'',reportValidity:()=>true});return elements.get(id);}};
   const context={document,SvoyaCloudConfig:{url:'public',key:'public'},SvoyaOrganizer:O,createCloudBackup:()=>cloud,fetch:()=>{},location:{hash:'',pathname:'/',search:''},history:{replaceState(){}},confirm:()=>allow,organizerBackup:{snapshot:()=>({state:O.seed(),raw:'initial'}),restore:(state,raw)=>calls.push(['restore',raw])},setTimeout:f=>{const id=++timerId;timers.set(id,f);return id;},clearTimeout:id=>timers.delete(id),addEventListener:(name,f)=>{events[name]=f;}};context.window=context;
   document.getElementById('cloudAuto').checked=true;
@@ -82,4 +82,10 @@ test('Cloud status detects local changes after saving instead of claiming they a
   ui.context.organizerBackup.snapshot=()=>({state:{version:1,tasks:[]},raw:'changed'});
   await ui.$('cloudCheck').onclick();
   assert.match(ui.$('cloudSyncState').textContent,/Списки различаются/);
+});
+test('Command auth expiry or rejection clears the account view and pending autosave without losing tasks',async()=>{
+  const ui=setup();await login(ui);assert.equal(ui.context.getOrganizerAccessToken(),'private-token');
+  change(ui,{version:1,tasks:[]});assert.equal(ui.timers.size,1);ui.context.clearOrganizerSession();
+  assert.equal(ui.timers.size,0);assert.equal(ui.$('cloudAuth').hidden,false);assert.throws(()=>ui.context.getOrganizerAccessToken(),/Войди снова/);
+  assert.equal(ui.context.organizerBackup.snapshot().state.tasks.length,0);
 });
