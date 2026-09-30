@@ -42,6 +42,7 @@
 <p class="org-note">Пароль вводи только здесь. После регистрации подтверди почту. При обновлении страницы потребуется войти снова.</p>
 </form>
 <div id="cloudActions" hidden><p>Аккаунт: <strong id="cloudAccount"></strong></p><div class="org-actions"><button id="cloudCheck" type="button">Проверить копию</button><button id="cloudSave" type="button" class="primary">Сохранить в аккаунте</button><button id="cloudRestore" type="button">Восстановить из аккаунта</button><button id="cloudLogout" type="button">Выйти</button></div></div>
+<p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
 <p id="cloudMessage" role="status" aria-live="polite"></p>
 </details>
 <details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
@@ -66,7 +67,7 @@
   </div>
   <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
 </div>
-<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
+<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress" title="Индикатор ожидания. Завершение подтверждается полученным ответом."><div class="progress-bar" id="progressBar"></div></div></div>
 <details class="diagnostics"><summary>Что происходит с запросом</summary><div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
@@ -155,18 +156,22 @@ $("run").onclick=async()=>{
  if(decision==="apply" && pendingTask && task!==pendingTask){ $("result").textContent="Задача изменилась. Подтверждение сброшено."; pendingTask=""; return; }
  if(decision==="apply" || decision==="preview") pendingTask="";
  const stages=["Понимаю задачу…","Проверяю риск…","Выбираю маршрут…","Отправляю запрос модели…","Получаю ответ…","Проверяю результат…"];
- const activityMessages=["Анализирую запрос…","Проверяю безопасность…","Определяю подходящий маршрут…","Модель работает над задачей…","Проверяю полученный результат…"];
- let stageIndex=0, progress=0, agentPending=false;
+ 
+ let agentPending=false;
  const generation=++requestGeneration;
  const started=performance.now();
  $("run").disabled=true;$("result").textContent="";hideApproval();$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
- $("activity").classList.add("active"); $("activityText").textContent=activityMessages[0]; $("progressBar").style.width="8%";
+ $("activity").classList.add("active"); $("activityText").textContent="Отправляю запрос…"; $("progressBar").style.width="8%";
  const timerId=setInterval(()=>{$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
- const activityId=setInterval(()=>{stageIndex=Math.min(stageIndex+1,activityMessages.length-1);$("activityText").textContent=activityMessages[stageIndex];progress=Math.min(progress+16,82);$("progressBar").style.width=progress+"%"},700);
+ const activityId=setInterval(()=>{
+   const elapsed=Math.max(0,performance.now()-started);
+   $("progressBar").style.width=(8+90*elapsed/(elapsed+45000))+"%";
+ },250);
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
    const organizerContext=window.getOrganizerContext();
+   $("activityText").textContent="Ожидаю ответ помощника…";
    const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"})});
    const data=await response.json();
    clearInterval(activityId);

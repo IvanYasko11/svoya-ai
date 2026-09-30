@@ -11,7 +11,7 @@
     try {
       if(!recovery && storage.getItem(O.KEY)!==raw) throw new Error('Задачи изменены в другой вкладке. Обнови страницу перед сохранением.');
       const clean=O.save(storage,next); state=clean; raw=storage.getItem(O.KEY); render();
-      message('Сохранено в этом браузере.'); return true;
+      message('Сохранено в этом браузере.'); window.dispatchEvent?.(new Event('svoya:tasks-saved')); return true;
     } catch(e){message('Не сохранено: '+e.message); return false;}
   }
   function node(tag,text){const e=document.createElement(tag); if(text!==undefined)e.textContent=text; return e;}

@@ -24,3 +24,12 @@ test('Failed local restore never reports success; signup waits for email confirm
   ui.$('cloudEmail').value='owner@example.com';ui.$('cloudPassword').value='secret';await ui.$('cloudSignup').onclick();
   assert.equal(ui.$('cloudPassword').value,'');assert.match(ui.$('cloudMessage').textContent,/подтверждения/);assert.equal(ui.$('cloudActions').hidden,true);
 });
+test('Cloud status detects local changes after saving instead of claiming they are uploaded',async()=>{
+  const ui=setup();ui.$('cloudEmail').value='owner@example.com';ui.$('cloudPassword').value='secret';
+  await ui.$('cloudAuth').onsubmit({preventDefault(){}});
+  assert.match(ui.$('cloudSyncState').textContent,/совпадает/);
+  await ui.$('cloudSave').onclick();
+  ui.context.organizerBackup.snapshot=()=>({state:{version:1,tasks:[]},raw:'changed'});
+  await ui.$('cloudCheck').onclick();
+  assert.match(ui.$('cloudSyncState').textContent,/локальные изменения/);
+});
