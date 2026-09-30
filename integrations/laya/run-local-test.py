@@ -20,7 +20,19 @@ import venv
 
 ROOT = Path(__file__).resolve().parent
 LABELS = {"coding", "files", "research", "general", "unclear"}
-CHECKPOINT = "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67"
+# Router defaults to a bundled repository with the multilingual subfolder.
+# Its revision is not the standalone laya-multilingual repository revision.
+CHECKPOINT = "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851"
+CHECKPOINT_REPO = "convaiinnovations/laya"
+CHECKPOINT_SUBFOLDER = "multilingual"
+
+def check_health(health):
+    if not isinstance(health, dict) or health.get("status") != "ok":
+        raise ValueError("invalid health response")
+    revisions = health.get("revisions")
+    if (health.get("loaded") != ["multilingual"] or not isinstance(revisions, dict)
+        or revisions.get("multilingual") != CHECKPOINT):
+        raise ValueError("checkpoint mismatch")
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -64,6 +76,7 @@ def summary(rows, startup_seconds):
     answered = [r for r in rows if r["category"] is not None]
     correct = sum(r["correct"] for r in answered)
     return {"schema_version": "svoya-intent-v1", "checkpoint_revision": CHECKPOINT,
+            "checkpoint_repo": CHECKPOINT_REPO, "checkpoint_subfolder": CHECKPOINT_SUBFOLDER,
             "mode": "local_smoke", "execution_changed": False, "permission_granted": False,
             "cases": len(rows), "answered": len(answered), "correct": correct,
             "accuracy_on_answered": correct / len(answered) if answered else None,
@@ -109,8 +122,15 @@ def main():
                     print("Сервис не стартовал за 15 минут. Тест не пройден; результата точности нет."); return 1
                 try:
                     health = local_json("/health", key, timeout=2)
-                    if health.get("revisions", {}).get("multilingual") != CHECKPOINT:
-                        print("Checkpoint не совпадает с закреплённой ревизией. Тест остановлен."); return 1
+                    try: check_health(health)
+                    except ValueError:
+                        print("Версия модели или список загруженных моделей не совпадают. Тест остановлен.")
+                        revisions = health.get("revisions") if isinstance(health, dict) else None
+                        actual = revisions.get("multilingual") if isinstance(revisions, dict) else None
+                        if isinstance(actual, str) and len(actual) == 40 and all(c in "0123456789abcdef" for c in actual):
+                            print("Ожидаемая ревизия: %s; полученная: %s" % (CHECKPOINT, actual))
+                        else: print("Сервис не сообщил корректную ревизию модели.")
+                        return 1
                     break
                 except (URLError, TimeoutError, OSError):
                     if time.monotonic() >= next_update:

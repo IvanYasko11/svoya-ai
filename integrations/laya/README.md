@@ -51,7 +51,7 @@ The API receives the ordinary operator bearer token in the Authorization header.
 ## Reviewed versions / red team
 
 - Upstream source: [NandhaKishorM/laya at 6d942c9](https://github.com/NandhaKishorM/laya/tree/6d942c92081fbc139e736bbd9ac0023223c29b7f), pyproject 0.3.22, Apache-2.0.
-- Multilingual checkpoint: `convaiinnovations/laya-multilingual` revision `e4e9ddf21a7b1903b7acffd8814ad4307bf63a67`, pinned by `LAYA_REVISION=reviewed` in this source version.
+- Multilingual checkpoint: bundled repository `convaiinnovations/laya`, subfolder `multilingual`, revision `55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851`, pinned by `LAYA_REVISION=reviewed` in this source version. This is Router's default model location. The separate `convaiinnovations/laya-multilingual` repository has a different revision and is not used by this runner.
 - [Staged adoption](https://nandhakishorm.github.io/laya/staged-adoption/) explicitly separates a typed decision from permission and requires held-out evidence before promotion.
 
 | Finding | Evidence / scope | Current boundary |

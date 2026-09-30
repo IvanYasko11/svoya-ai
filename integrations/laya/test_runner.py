@@ -12,6 +12,18 @@ def sample():
         "probabilities": {"general": .8, "coding": .05, "files": .05, "research": .05, "unclear": .05}}}}
 
 class RunnerTests(unittest.TestCase):
+    def test_health_pins_bundle_revision_and_only_multilingual(self):
+        runner.check_health({"status": "ok", "loaded": ["multilingual"],
+                            "revisions": {"multilingual": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851"}})
+        for revision in [None, "latest", "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67", "a" * 40]:
+            with self.assertRaises(ValueError):
+                runner.check_health({"status": "ok", "loaded": ["multilingual"], "revisions": {"multilingual": revision}})
+        for loaded in [[], ["english"], ["multilingual", "english"]]:
+            with self.assertRaises(ValueError):
+                runner.check_health({"status": "ok", "loaded": loaded, "revisions": {"multilingual": runner.CHECKPOINT}})
+        for health in [None, [], {}, {"status": "ok", "loaded": ["multilingual"], "revisions": None}]:
+            with self.assertRaises(ValueError): runner.check_health(health)
+
     def test_rejects_bad_schema_and_nonfinite_values(self):
         self.assertEqual(runner.category_from(sample()), "general")
         for field, value in [("choice", "shell"), ("answer_confidence", float("nan")), ("answer_confidence", 1.1), ("low_confidence", True)]:
