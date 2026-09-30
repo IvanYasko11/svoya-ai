@@ -86,6 +86,8 @@ const $=id=>document.getElementById(id);
 let pendingTask="";
 let pendingRoute="";
 let forcedDecision=null;
+let requestGeneration=0;
+function finishActivity(){ $("activity").classList.remove("active"); }
 
 function hideApproval(){
   $("approval").classList.remove("active");
@@ -154,7 +156,8 @@ $("run").onclick=async()=>{
  if(decision==="apply" || decision==="preview") pendingTask="";
  const stages=["Понимаю задачу…","Проверяю риск…","Выбираю маршрут…","Отправляю запрос модели…","Получаю ответ…","Проверяю результат…"];
  const activityMessages=["Анализирую запрос…","Проверяю безопасность…","Определяю подходящий маршрут…","Модель работает над задачей…","Проверяю полученный результат…"];
- let stageIndex=0, progress=0;
+ let stageIndex=0, progress=0, agentPending=false;
+ const generation=++requestGeneration;
  const started=performance.now();
  $("run").disabled=true;$("result").textContent="";hideApproval();$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
  $("activity").classList.add("active"); $("activityText").textContent=activityMessages[0]; $("progressBar").style.width="8%";
@@ -166,6 +169,7 @@ $("run").onclick=async()=>{
    const organizerContext=window.getOrganizerContext();
    const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"})});
    const data=await response.json();
+   clearInterval(activityId);
 
    if(data?.risk_level){
      $("risk").textContent=data.risk_level+(data.requires_confirmation?" — требуется подтверждение":" — разрешено");$("route").textContent=(data.intent||"UNKNOWN")+" → "+(data.route||"UNKNOWN");
@@ -183,27 +187,26 @@ $("run").onclick=async()=>{
      return;
    }
 
-   $("status").textContent=stages[2]; await new Promise(r=>setTimeout(r,250));
-   $("status").textContent=stages[3];
-   $("status").textContent=stages[4];
+   $("status").textContent="Проверяю ответ…";
    const verification=verifyResponse(data,task);
    $("verify").textContent=verification.ok?"TECHNICAL PASS — "+verification.summary:"TECHNICAL FAIL — "+verification.summary;
    if(!verification.ok) throw new Error("Ответ не прошёл техническую проверку.");
    $("progressBar").style.width="100%"; $("activityText").textContent="Готово — ответ проверен.";
-   await new Promise(r=>setTimeout(r,200));
-   $("status").textContent=stages[5]; await new Promise(r=>setTimeout(r,200));
    $("status").textContent="Готово";
-   $("result").textContent="PASS\n\n"+data.answer+"\n\nРежим: "+(data.apply_changes?"APPLY → изолированная ветка + Draft PR":"PREVIEW → без изменений в репозитории")+"\nПровайдер: "+data.provider+"\nМодель: "+data.model;
+   $("result").textContent="Результат\n\n"+data.answer+"\n\nРежим: "+(data.apply_changes?"APPLY → изолированная ветка + Draft PR":"PREVIEW → без изменений в репозитории")+"\nПровайдер: "+data.provider+"\nМодель: "+data.model;
    if(data.route==="CODING_AGENT" && data.task_id){
+     agentPending=true;$("status").textContent="Coding Agent работает";
      $("activityText").textContent="Coding Agent запущен — жду результат…";
      let attempts=0;
      const poll=async()=>{
+       if(generation!==requestGeneration)return;
        attempts++;
        try{
          const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id));
          const sd=await sr.json();
+         if(generation!==requestGeneration)return;
          if(sd.status==="completed"){
-           $("activityText").textContent="Coding Agent завершил работу.";
+           finishActivity();$("activityText").textContent="Coding Agent завершил работу.";
            $("result").textContent+="\n\nСтатус агента: COMPLETED\nRun: "+sd.run_id;
            $("status").textContent="Готово";
            if(sd.url) $("result").textContent+="\nGitHub Actions: "+sd.url;
@@ -211,7 +214,7 @@ $("run").onclick=async()=>{
            return;
          }
          if(sd.status==="failed"){
-           $("activityText").textContent="Coding Agent завершил работу с ошибкой.";
+           finishActivity();$("activityText").textContent="Coding Agent завершил работу с ошибкой.";
            $("result").textContent+="\n\nСтатус агента: FAILED\nRun: "+sd.run_id;
            $("status").textContent="Агент завершил с ошибкой";
            return;
@@ -220,11 +223,14 @@ $("run").onclick=async()=>{
            $("activityText").textContent="Coding Agent работает… попытка "+attempts+"/15";
            setTimeout(poll,2000);
          }else{
+           finishActivity();$("status").textContent="Работа продолжается в GitHub Actions";
            $("activityText").textContent="Агент продолжает работу в GitHub Actions.";
            $("result").textContent+="\n\nСтатус агента: RUNNING/QUEUED";
          }
        }catch{
+         if(generation!==requestGeneration)return;
          if(attempts<15) setTimeout(poll,2000);
+         else {finishActivity();$("status").textContent="Статус агента недоступен";}
        }
      };
      setTimeout(poll,1500);
@@ -237,6 +243,7 @@ $("run").onclick=async()=>{
    $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
  }finally{
    clearInterval(timerId);clearInterval(activityId);
+   if(!agentPending)finishActivity();
    $("run").disabled=false;
  }
 };

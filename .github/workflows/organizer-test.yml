@@ -20,6 +20,7 @@ jobs:
       - run: node scripts/cloud-backup.test.cjs
       - run: node scripts/cloud-ui.test.cjs
       - run: node scripts/chat.test.mjs
+      - run: node scripts/chat-ui.test.cjs
       - run: node scripts/provider-router.test.cjs
       - run: node --check organizer-ui.js
       - run: node --check cloud-ui.js
