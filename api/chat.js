@@ -1,3 +1,5 @@
+import intentRouting from '../lib/intent-routing.cjs';
+const { classifyIntent } = intentRouting;
 import { buildPlan } from "../lib/planner.js";
 import { selectTools } from "../lib/tools.js";
 
@@ -38,19 +40,6 @@ function classifyRisk(task) {
   return { level: "LOW", requiresConfirmation: false };
 }
 
-function classifyIntent(task) {
-  const text = task.toLowerCase();
-  if (/(код|скрипт|программ|функци|javascript|python|sql|debug)/i.test(text)) {
-    return { intent: "CODING", route: "CODING_AGENT" };
-  }
-  if (/(файл|pdf|документ|таблиц|xlsx|csv|docx)/i.test(text)) {
-    return { intent: "FILE_ANALYSIS", route: "FILE_TOOL" };
-  }
-  if (/(сейчас|сегодня|последн|актуаль|новост|цена|курс|погода|интернет|исследуй|research)/i.test(text)) {
-    return { intent: "WEB_RESEARCH", route: "WEB_RESEARCH" };
-  }
-  return { intent: "GENERAL", route: "LLM" };
-}
 
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");

@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [ai/task-organizer]
+    branches: [ai/task-organizer, ai/laya-shadow]
 permissions:
   contents: read
 jobs:
@@ -29,6 +29,10 @@ jobs:
       - run: node --check app-shell.js
       - run: node scripts/chat-ui.test.cjs
       - run: node scripts/provider-router.test.cjs
+      - run: node scripts/laya-adapter.test.cjs
+      - run: node scripts/laya-compare.test.mjs
+      - run: python -m unittest discover -s integrations/laya -p 'test_*.py'
+      - run: node --check api/laya-compare.js
       - run: node --check organizer-ui.js
       - run: node --check cloud-ui.js
       - run: node --check api/chat.js
