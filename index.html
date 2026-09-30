@@ -1,29 +1,64 @@
 <!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>СВОЯ AI — Operator</title>
-<link rel="stylesheet" href="/styles.css">
-</head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#11151b"><title>СВОЯ AI — личный помощник</title><link rel="stylesheet" href="/styles.css"></head>
 <body>
+<a class="skip-link" href="#mainContent">К содержимому</a>
 <div class="ambient" aria-hidden="true"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="orb orb-three"></div></div>
-<main class="wrap">
-<header class="top"><a class="brand" href="#home"><span class="brand-mark">S</span><span>СВОЯ AI<small>Твой личный помощник</small></span></a><nav aria-label="Основная навигация"><a href="#home">Сегодня</a><a href="#taskList">Задачи</a><a href="#assistant">Спросить ИИ</a></nav><span class="badge"><span class="dot"></span> Твоё пространство</span></header>
-<section class="welcome" id="home"><div class="eyebrow">МЕНЬШЕ СУЕТЫ · БОЛЬШЕ ЯСНОСТИ</div><h1>Всё важное.<br><span>В одном месте.</span></h1><p>Выбери следующий шаг — остальное подождёт.</p><div class="summary"><div><strong id="orgActiveCount">0</strong><span>в работе</span></div><div><strong id="orgWaitingCount">0</strong><span>ждут решения</span></div><div><strong id="orgDoneCount">0</strong><span>завершено</span></div></div></section>
-<section class="card" aria-labelledby="organizerHeading">
-<div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Твой следующий шаг</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
+<div class="app-shell">
+<aside class="sidebar"><a class="brand" href="#assistant"><span class="brand-mark">S</span><span>СВОЯ AI<small>Твой личный помощник</small></span></a>
+<a class="sidebar-create" href="#tasks" id="sidebarNew">＋ Новая задача</a>
+<div class="nav-caption">МОЁ ПРОСТРАНСТВО</div>
+<nav class="app-nav" aria-label="Основная навигация">
+<a href="#assistant" data-nav="assistant" aria-current="page"><span aria-hidden="true">✦</span>Чат с ИИ</a>
+<a href="#home" data-nav="home"><span aria-hidden="true">☀</span>Сегодня</a>
+<a href="#tasks" data-nav="tasks"><span aria-hidden="true">☷</span>Мои задачи</a>
+<a href="#cloud" data-nav="account"><span aria-hidden="true">◎</span>Аккаунт</a></nav>
+<div class="sidebar-footer"><div class="sidebar-tip">Начни с одной задачи.<br>Остальное подождёт.</div><a href="#cloud" class="account-shortcut"><span class="account-avatar" aria-hidden="true">Я</span><span id="navAccountState">Войти в аккаунт<small>Сохранение между устройствами</small></span></a></div></aside>
+<main class="wrap" id="mainContent" tabindex="-1"><header class="workspace-bar"><div><span class="workspace-title" id="viewTitle">Чат с ИИ</span><span class="workspace-subtitle">Личное пространство</span></div><a href="#cloud" class="session-chip" id="sessionChip"><span class="dot"></span><span id="sessionLabel">Войти для ИИ</span></a></header>
+<section class="view assistant" id="assistant" data-view="assistant" aria-labelledby="chatHeading">
+<div class="chat-intro"><span class="intro-mark" aria-hidden="true">S</span><div class="eyebrow">ТВОЙ ЛИЧНЫЙ ПОМОЩНИК</div><h1 id="chatHeading">С чего начнём?</h1><p>Разберём идею, выберем следующий шаг или составим план.</p>
+<div class="chat-suggestions"><button type="button" data-chat-prompt="Выбери один следующий шаг на 20 минут по моим задачам.">Выбрать следующий шаг <span>По моим задачам</span></button><button type="button" data-chat-prompt="Проверь мою идею на слабые места. Сначала попроси меня описать её.">Проверить идею <span>Риски и сильные стороны</span></button><button type="button" data-chat-prompt="Помоги составить реалистичный план на сегодня по моим задачам.">Составить план <span>Без перегруза</span></button></div></div>
+<div class="chat-answer"><div class="answer-label" id="answerLabel" hidden>СВОЯ AI <span>Ответ помощника</span></div><div class="result" id="result" role="status" aria-live="polite"></div></div>
+<div class="approval" id="approval">
+  <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
+  <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
+  <div class="approval-meta">
+    <div class="approval-box"><div class="approval-label">Риск</div><div class="approval-value" id="approvalRisk">—</div></div>
+    <div class="approval-box"><div class="approval-label">Действие</div><div class="approval-value" id="approvalAction">—</div></div>
+  </div>
+  <div class="approval-actions">
+    <button class="approve" id="approveBtn">✓ Разрешить изменения</button>
+    <button class="preview" id="previewBtn">◉ Только проверить</button>
+    <button class="cancel" id="cancelBtn">Отмена</button>
+  </div>
+  <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
+</div>
+<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress" title="Индикатор ожидания. Завершение подтверждается полученным ответом."><div class="progress-bar" id="progressBar"></div></div></div>
+<div class="composer"><label class="muted" for="task">Сообщение помощнику</label>
+<textarea id="task" placeholder=""></textarea>
+<p class="org-note"><label><input id="orgShare" type="checkbox"> Учесть мои активные и заблокированные задачи в ответе</label><br>ИИ предложит план. Для изменения списка используй команду во вкладке «Задачи».</p>
+<button id="run" class="primary">Отправить ↑</button>
+<details class="chat-privacy"><summary>Доступ и приватность</summary><p class="org-note">Для ИИ нужен вход в аккаунт владельца. Coding Agent работает с публичным GitHub-проектом: его задания, отчёты и код могут быть видны другим. Личные данные туда не отправляй.</p></details>
+</div><details class="diagnostics"><summary>Что происходит с запросом</summary><div class="steps">
+<div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
+<div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
+</div>
+<div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span><br><b>Router:</b> <span id="route">ожидает классификации</span></div>
+<div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
+</details></section><section class="view" id="home" data-view="home" aria-label="Сегодня" hidden><div class="welcome"><div class="eyebrow">МЕНЬШЕ СУЕТЫ · БОЛЬШЕ ЯСНОСТИ</div><h1>Сегодня —<br><span>один шаг вперёд.</span></h1><p>Выбери следующий шаг — остальное подождёт.</p><div class="summary"><div><strong id="orgActiveCount">0</strong><span>в работе</span></div><div><strong id="orgWaitingCount">0</strong><span>ждут решения</span></div><div><strong id="orgDoneCount">0</strong><span>завершено</span></div></div></div>
+<div class="card"><div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
+<a class="text-link" href="#tasks">Все задачи →</a></div></section><section class="card view" id="view-tasks" data-view="tasks" aria-labelledby="organizerHeading" hidden>
+<div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Мои задачи</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
 <div class="command-box">
 <label for="orgCommand">Скажи, что нужно сделать с задачами</label>
 <label class="org-field command-target">К какой задаче <select id="orgTarget"><option value="">По названию в команде</option></select></label>
 <form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Разбей цель про агента на три шага"><button id="orgParse" type="submit" class="primary">Разобрать →</button></form>
-<p class="org-note">Сначала предложение, затем «Применить». Для свободной фразы нужны вход и модель: ей отправятся команда и выбранная карточка, либо список задач без архива. <a id="orgLoginLink" href="#cloud">Войти в аккаунт</a></p>
+<p class="org-note">Сначала предложение, затем «Применить». Для свободной фразы войди в аккаунт. Модель получит команду и выбранную карточку, либо задачи без архива. <a id="orgLoginLink" href="#cloud">Войти в аккаунт</a></p>
 <div id="orgPlanning" class="command-wait" hidden role="status"><span class="command-spinner" aria-hidden="true"></span><span>Готовлю предложение…</span><button id="orgStop" type="button" class="secondary">Отмена</button></div>
 <div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div>
 <div id="orgProposal" class="proposal" hidden><div id="orgProposalText"></div><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
 <p id="organizerMessage" role="status" aria-live="polite"></p>
 <p id="cloudSyncState" class="org-note" role="status" aria-live="polite"></p>
-<div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
 <div class="org-grid"><div id="taskList">
 <h3>Все задачи</h3>
 <label class="org-field">Поиск<input id="orgSearch" type="search" placeholder="Название или следующий шаг"></label>
@@ -41,7 +76,7 @@
 <div class="org-actions"><button id="orgSave" type="submit">Добавить задачу</button><button id="orgCancel" type="button">Сбросить форму</button></div>
 </form></details>
 <div class="quiet-card"><span class="eyebrow">ТВОЙ ТЕМП</span><h3>Не нужно успевать всё.</h3><p>Сначала одна важная задача. Потом следующая.</p></div></aside></div>
-<details class="backup" id="cloud"><summary>Аккаунт · перенос задач между устройствами</summary>
+</section><section class="view card account-view" id="view-account" data-view="account" aria-labelledby="accountHeading" hidden><div class="eyebrow">ТВОИ ДАННЫЕ</div><h2 id="accountHeading">Аккаунт и сохранение</h2><p class="muted">Задачи на этом устройстве и копия для переноса между устройствами.</p><details class="backup" id="cloud"><summary>Аккаунт · перенос задач между устройствами</summary>
 <p class="org-note">Сначала список сохраняется в этом браузере. После входа изменения сохраняются автоматически, когда локальный список совпадает с копией аккаунта. Если списки различаются, сначала выбери нужную копию. Вход сам по себе не меняет задачи. Для загрузки изменений с другого устройства нажми «Восстановить из аккаунта».</p>
 <form id="cloudAuth" class="cloud-auth">
 <label class="org-field">Почта<input id="cloudEmail" type="email" required autocomplete="username" maxlength="254"></label>
@@ -54,43 +89,14 @@
 </details>
 <details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
 </details>
-</section>
-<section class="card assistant" id="assistant">
-<div class="eyebrow">ПОМОЩНИК</div><h2>Давай подумаем вместе</h2><label class="muted" for="task">Вопрос, идея или задача</label>
-<textarea id="task" placeholder=""></textarea>
-<p class="org-note"><label><input id="orgShare" type="checkbox"> Учесть мои активные и заблокированные задачи в ответе</label><br>ИИ предложит план. Для изменения списка используй команду организатору выше.</p>
-<button id="run" class="primary">Спросить помощника →</button>
-<p class="org-note">Для ИИ нужен вход в аккаунт владельца. Coding Agent работает с публичным GitHub-проектом: его задания, отчёты и код могут быть видны другим. Личные данные туда не отправляй.</p>
-<div class="approval" id="approval">
-  <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
-  <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
-  <div class="approval-meta">
-    <div class="approval-box"><div class="approval-label">Риск</div><div class="approval-value" id="approvalRisk">—</div></div>
-    <div class="approval-box"><div class="approval-label">Действие</div><div class="approval-value" id="approvalAction">—</div></div>
-  </div>
-  <div class="approval-actions">
-    <button class="approve" id="approveBtn">✓ Разрешить изменения</button>
-    <button class="preview" id="previewBtn">◉ Только проверить</button>
-    <button class="cancel" id="cancelBtn">Отмена</button>
-  </div>
-  <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
-</div>
-<div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress" title="Индикатор ожидания. Завершение подтверждается полученным ответом."><div class="progress-bar" id="progressBar"></div></div></div>
-<details class="diagnostics"><summary>Что происходит с запросом</summary><div class="steps">
-<div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
-<div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
-</div>
-<div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span><br><b>Router:</b> <span id="route">ожидает классификации</span></div>
-<div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
-</details><div class="result" id="result" role="status" aria-live="polite"></div>
-</section>
-</main>
+</section></main></div>
 <script src="/organizer-core.js"></script>
 <script src="/organizer-proposals.js"></script>
 <script src="/organizer-ui.js"></script>
 <script src="/cloud-config.js"></script>
 <script src="/cloud-backup.js"></script>
 <script src="/cloud-ui.js"></script>
+<script src="/app-shell.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let pendingTask="";
@@ -189,7 +195,7 @@ $("run").onclick=async()=>{
  try{
    let accessToken;
    try{accessToken=window.getOrganizerAccessToken?.();if(!accessToken)throw new Error('Войди в аккаунт в разделе «Аккаунт», затем повтори запрос.');}
-   catch(e){$("cloud").open=true;throw e;}
+   catch(e){$("cloud").open=true;window.openSvoyaView?.('account');throw e;}
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
    const organizerContext=window.getOrganizerContext();
@@ -206,7 +212,7 @@ $("run").onclick=async()=>{
    }
 
    if(!response.ok){
-     if(response.status===401){window.clearOrganizerSession?.();$("cloud").open=true;$("result").textContent=data?.error||'Сессия закончилась. Войди снова.';return;}
+     if(response.status===401){window.clearOrganizerSession?.();$("cloud").open=true;window.openSvoyaView?.('account');$("result").textContent=data?.error||'Сессия закончилась. Войди снова.';return;}
      if(response.status===409 && data?.requires_confirmation){
        showApproval(data,task);
        $("result").textContent="Остановлено перед потенциально опасным действием. Выбери действие выше.";
@@ -235,12 +241,12 @@ $("run").onclick=async()=>{
        try{
          let pollToken;
          try{pollToken=window.getOrganizerAccessToken?.();if(!pollToken)throw new Error('Сессия закончилась. Войди снова.');}
-         catch(e){finishActivity();$("cloud").open=true;$("status").textContent=e.message;return;}
+         catch(e){finishActivity();$("cloud").open=true;window.openSvoyaView?.('account');$("status").textContent=e.message;return;}
          const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id),{headers:{Authorization:'Bearer '+pollToken}});
          const sd=await sr.json();
          if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
          if(!sr.ok){
-           if(sr.status===401){window.clearOrganizerSession?.();$("cloud").open=true;}
+           if(sr.status===401){window.clearOrganizerSession?.();$("cloud").open=true;window.openSvoyaView?.('account');}
            if([401,403,404].includes(sr.status)){finishActivity();$("status").textContent=sd.error||'Задача недоступна в этом аккаунте.';return;}
            throw new Error('Статус временно недоступен.');
          }

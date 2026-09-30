@@ -30,7 +30,7 @@
       const done=node('button','✓ Готово');done.type='button';done.className='task-done';done.onclick=()=>commit(O.upsert(state,{...t,status:'done'}));e.append(done);
     }
     const command=node('button','Дать команду');command.type='button';command.className='task-edit';command.onclick=()=>{
-      invalidate();$('orgTarget').value=t.id;$('orgCommand').focus();message('Выбрана задача «'+t.title+'». Можно написать: «заверши эту» или «разбей её на три шага».');
+      window.openSvoyaView?.('tasks');invalidate();$('orgTarget').value=t.id;$('orgCommand').focus();message('Выбрана задача «'+t.title+'». Можно написать: «заверши эту» или «разбей её на три шага».');
     };e.append(command);
     const b=node('button','Изменить'); b.type='button';b.className='task-edit'; b.onclick=()=>edit(t); e.append(b); return e;
   }
@@ -55,7 +55,7 @@
     if(!tasks.length)list.append(node('p','В этом списке нет задач.'));
   }
   function edit(t){
-    $('orgEditor').open=true;
+    window.openSvoyaView?.('tasks');$('orgEditor').open=true;
     editing=t.id; $('orgTitle').value=t.title; $('orgNext').value=t.next; $('orgBlocker').value=t.blocker;
     $('orgPriority').value=t.priority;$('orgStatus').value=t.status;$('orgDue').value=t.due;
     $('orgSave').textContent='Сохранить изменения';$('orgTitle').focus();
@@ -71,7 +71,7 @@
   $('orgCancel').onclick=reset;
   $('organizerFilter').onchange=render;
   $('orgSearch').oninput=render;
-  $('orgNew').onclick=()=>{reset();$('orgEditor').open=true;$('orgTitle').focus();};
+  $('orgNew').onclick=()=>{reset();window.openSvoyaView?.('tasks');$('orgEditor').open=true;$('orgTitle').focus();};
   function preview(next,source,metadata=''){
     const changes=P.diff(state,next);
     if(!changes.length){message('Задачи уже имеют указанные значения.');return;}
@@ -110,7 +110,7 @@
         if(!selectedId&&P.needsSelection(command))throw new Error('Уточни задачу: выбери карточку в поле «К какой задаче» или укажи её полное название.');
         let token;
         try{token=window.getOrganizerAccessToken?.();if(!token)throw new Error('Для свободной команды войди в аккаунт в разделе «Аккаунт».');}
-        catch(e){$('cloud').open=true;throw e;}
+        catch(e){$('cloud').open=true;window.openSvoyaView?.('account');throw e;}
         planningController=new AbortController();const controller=planningController;
         planning(true);message('Готовлю предложение. Задачи пока не изменены.');
         timeout=setTimeout(()=>controller.abort(),120000);
@@ -118,7 +118,7 @@
         const data=await response.json();
         if(generation!==commandGeneration)return;
         if(source!==raw||storage.getItem(O.KEY)!==source||$('orgCommand').value!==command||$('orgTarget').value!==selectedId)throw new Error('Список или команда изменились во время разбора. Повтори команду.');
-        if(!response.ok){if(response.status===401){window.clearOrganizerSession?.();$('cloud').open=true;}throw new Error((data.error||'Не удалось разобрать команду.')+(data.hint?' '+data.hint:''));}
+        if(!response.ok){if(response.status===401){window.clearOrganizerSession?.();$('cloud').open=true;window.openSvoyaView?.('account');}throw new Error((data.error||'Не удалось разобрать команду.')+(data.hint?' '+data.hint:''));}
         const checked=P.apply(state,data.plan,{selectedId});
         if(checked.kind==='clarification')message(checked.message);
         else preview(checked.state,source,(data.provider||'модель')+' · '+(data.model||''));
@@ -128,7 +128,7 @@
   };
   $('orgCommand').oninput=()=>{invalidate();message('Команда изменена. Нажми «Разобрать», чтобы получить новое предложение.');};
   $('orgTarget').onchange=()=>{invalidate();message('Выбор задачи изменён. Нажми «Разобрать».');};
-  $('orgLoginLink').onclick=()=>{$('cloud').open=true;};
+  $('orgLoginLink').onclick=()=>{$('cloud').open=true;window.openSvoyaView?.('account');};
   $('orgApply').onclick=()=>{
     if(!proposed)return;
     if(proposalRaw!==raw || storage.getItem(O.KEY)!==proposalRaw||proposalCommand!==$('orgCommand').value||proposalSelected!==$('orgTarget').value){message('Список изменился или команда отредактирована. Повтори команду для актуальных задач.');invalidate();return;}
