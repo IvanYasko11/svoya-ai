@@ -4,35 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>СВОЯ AI — Operator</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:#0b1020;color:#eef2ff}
-.wrap{max-width:1000px;margin:0 auto;padding:48px 20px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}
-h1{font-size:42px;margin:0 0 8px}.muted{color:#9aa6c0}.badge{padding:8px 12px;border:1px solid #33405f;border-radius:999px;font-size:13px}
-.card{margin-top:28px;background:#11182b;border:1px solid #26324d;border-radius:18px;padding:22px}
-textarea{width:100%;min-height:120px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:12px;padding:14px;font:inherit;resize:vertical}
-button{margin-top:12px;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease}
-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.22)}
-button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;gap:8px;margin-top:16px}.dot{width:9px;height:9px;border-radius:50%;background:#6ee7b7}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.approval{display:none;margin-top:18px;border:1px solid #5b4b20;border-radius:16px;background:linear-gradient(180deg,#1b1a13,#141827);padding:18px}.approval.active{display:block}.approval-title{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.approval-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#2a2414;border:1px solid #6b5720}.approval-text{margin-top:10px;color:#c6cede;line-height:1.5}.approval-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.approval-box{padding:11px 12px;border-radius:11px;background:#0c1221;border:1px solid #28334c}.approval-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7f8ba5}.approval-value{margin-top:4px;font-weight:700}.approval-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.approve{background:#6ee7b7;color:#07130f}.preview{background:#26324d;color:#eef2ff}.cancel{background:transparent;color:#9aa6c0;border:1px solid #33405f}.approval-note{margin-top:11px;font-size:12px;color:#8995ad}@media(max-width:700px){.approval-meta{grid-template-columns:1fr}}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
-</style>
-<style>
-.org-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.org-task{padding:14px;margin:10px 0;border:1px solid #33405f;border-radius:12px}.org-task div{color:#9aa6c0;font-size:13px;margin-top:6px}.org-task p{white-space:pre-wrap;overflow-wrap:anywhere}.org-field{display:block;margin-top:12px}.org-field input,.org-field select{width:100%;padding:10px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:8px;font:inherit}.org-field textarea{min-height:70px}.org-note{font-size:14px;line-height:1.5;color:#9aa6c0}.org-actions{display:flex;gap:10px;flex-wrap:wrap}#organizerMessage{min-height:24px;color:#6ee7b7;margin-top:12px}@media(max-width:700px){.org-grid{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<div class="ambient" aria-hidden="true"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="orb orb-three"></div></div>
 <main class="wrap">
-<div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.4 • Safe Apply</div></div>
+<header class="top"><a class="brand" href="#home"><span class="brand-mark">S</span><span>СВОЯ AI<small>Твой личный помощник</small></span></a><nav aria-label="Основная навигация"><a href="#home">Сегодня</a><a href="#taskList">Задачи</a><a href="#assistant">Спросить ИИ</a></nav><span class="badge"><span class="dot"></span> Твоё пространство</span></header>
+<section class="welcome" id="home"><div class="eyebrow">МЕНЬШЕ СУЕТЫ · БОЛЬШЕ ЯСНОСТИ</div><h1>Всё важное.<br><span>В одном месте.</span></h1><p>Выбери следующий шаг — остальное подождёт.</p><div class="summary"><div><strong id="orgActiveCount">0</strong><span>в работе</span></div><div><strong id="orgWaitingCount">0</strong><span>ждут решения</span></div><div><strong id="orgDoneCount">0</strong><span>завершено</span></div></div></section>
 <section class="card" aria-labelledby="organizerHeading">
-<h2 id="organizerHeading">Мои задачи</h2>
-<p class="org-note">Задачи сохраняются только в этом браузере. Для переноса на другое устройство используй резервную копию. Очистка данных браузера удалит локальный список. Отправка задач модели включается отдельно ниже.</p>
-<h3>Фокус на сегодня · до 3 задач</h3><div id="organizerToday"></div>
-<div class="org-grid"><div>
-<h3>Список задач</h3>
+<div class="section-head"><div><div class="eyebrow">ЛИЧНЫЙ ОРГАНИЗАТОР</div><h2 id="organizerHeading">Твой следующий шаг</h2></div><button id="orgNew" type="button" class="primary">＋ Новая задача</button></div>
+<div class="command-box"><label for="orgCommand">Скажи, что нужно сделать с задачами</label><form id="orgCommandForm"><input id="orgCommand" maxlength="1500" required autocomplete="off" placeholder="Добавь задачу: разобраться с агентом"><button type="submit" class="primary">Разобрать →</button></form><div class="chips"><button type="button" data-command="Что делать сегодня">План на сегодня</button><button type="button" data-command="Добавь задачу: ">Добавить задачу</button><button type="button" data-command="Покажи архив">Открыть архив</button><button type="button" data-command="Помощь">Как это работает</button></div><div id="orgProposal" class="proposal" hidden><p id="orgProposalText"></p><button id="orgApply" type="button" class="primary">Применить</button><button id="orgDismiss" type="button" class="secondary">Отмена</button></div></div>
+<p id="organizerMessage" role="status" aria-live="polite"></p>
+<div class="section-head"><h3>Фокус на сегодня</h3><span class="muted">До трёх задач. Без перегруза.</span></div><div id="organizerToday"></div>
+<div class="org-grid"><div id="taskList">
+<h3>Все задачи</h3>
+<label class="org-field">Поиск<input id="orgSearch" type="search" placeholder="Название или следующий шаг"></label>
 <label class="org-field">Показать<select id="organizerFilter"><option value="open">Незавершённые</option><option value="active">В работе</option><option value="waiting">Заблокированные</option><option value="deferred">Отложенные</option><option value="done">Готовые</option><option value="archived">Архив</option><option value="all">Все</option></select></label>
 <div id="organizerList"></div>
-</div><div>
-<h3>Задача и следующий шаг</h3>
+</div><aside>
+<details id="orgEditor"><summary>Создать или изменить задачу</summary><p class="org-note">Одно понятное действие помогает двигаться вперёд.</p>
 <form id="organizerForm">
 <label class="org-field">Цель<input id="orgTitle" required maxlength="200"></label>
 <label class="org-field">Следующий конкретный шаг<textarea id="orgNext" maxlength="1000"></textarea></label>
@@ -41,16 +31,16 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <label class="org-field">Статус<select id="orgStatus"><option value="active">В работе</option><option value="waiting">Заблокировано</option><option value="deferred">Отложено</option><option value="done">Готово</option><option value="archived">Архив</option></select></label>
 <label class="org-field">Срок, если нужен<input id="orgDue" type="date"></label>
 <div class="org-actions"><button id="orgSave" type="submit">Добавить задачу</button><button id="orgCancel" type="button">Сбросить форму</button></div>
-</form>
-</div></div>
-<div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
-<p id="organizerMessage" role="status" aria-live="polite"></p>
+</form></details>
+<div class="quiet-card"><span class="eyebrow">ТВОЙ ТЕМП</span><h3>Не нужно успевать всё.</h3><p>Сначала одна важная задача. Потом следующая.</p></div></aside></div>
+<details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
+</details>
 </section>
-<section class="card">
-<div class="muted">Команда</div>
+<section class="card assistant" id="assistant">
+<div class="eyebrow">ПОМОЩНИК</div><h2>Давай подумаем вместе</h2><label class="muted" for="task">Вопрос, идея или задача</label>
 <textarea id="task" placeholder=""></textarea>
-<p class="org-note"><label><input id="orgShare" type="checkbox"> Передать модели задачи «В работе» и «Заблокировано» для этого запроса</label><br>Модель предложит план. Статусы и приоритеты списка меняешь ты; ответ модели сам их не перезаписывает.</p>
-<button id="run">Запустить</button>
+<p class="org-note"><label><input id="orgShare" type="checkbox"> Учесть мои активные и заблокированные задачи в ответе</label><br>ИИ предложит план. Для изменения списка используй команду организатору выше.</p>
+<button id="run" class="primary">Спросить помощника →</button>
 <div class="approval" id="approval">
   <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
   <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
@@ -66,13 +56,13 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
   <div class="approval-note">Разрешение действует только для этой задачи. При применении Coding Agent работает в отдельной ветке и создаёт Draft PR. main автоматически не изменяется.</div>
 </div>
 <div class="status"><span class="dot"></span><span id="status">Готов к запуску</span></div><div class="activity" id="activity"><div class="activity-head"><span><span class="spinner"></span> <span id="activityText">Запускаю…</span></span><span class="timer" id="timer">0.0 с</span></div><div class="progress"><div class="progress-bar" id="progressBar"></div></div></div>
-<div class="steps">
+<details class="diagnostics"><summary>Что происходит с запросом</summary><div class="steps">
 <div class="step"><div class="num">01</div>Понять задачу</div><div class="step"><div class="num">02</div>Проверить риск</div><div class="step"><div class="num">03</div>Выбрать LLM</div>
 <div class="step"><div class="num">04</div>Выполнить</div><div class="step"><div class="num">05</div>Проверить</div><div class="step"><div class="num">06</div>Ответить</div>
 </div>
 <div class="risk"><b>Risk Gate:</b> <span id="risk">ожидает проверки сервером</span><br><b>Router:</b> <span id="route">ожидает классификации</span></div>
 <div class="verify"><b>Verifier:</b> <span id="verify">ожидает выполнения</span></div>
-<div class="result" id="result"></div>
+</details><div class="result" id="result" role="status" aria-live="polite"></div>
 </section>
 </main>
 <script src="/organizer-core.js"></script>
@@ -103,12 +93,12 @@ function showApproval(data, task){
 
 // Поле команды всегда пустое. Подсказка меняется при каждом открытии страницы.
 const examples=[
-  "Что сейчас происходит в мире ИИ?",
+  "Помоги выбрать следующий шаг по моим задачам.",
   "Найди способ заработать первые деньги онлайн без вложений.",
   "Проверь эту идею на слабые места.",
   "Напиши простой код и объясни, как он работает.",
   "Сравни несколько вариантов и покажи различия.",
-  "Исследуй тему и дай короткий вывод.",
+  "Разложи большую задачу на три небольших шага.",
   "Помоги мне автоматизировать эту задачу.",
   "Разбери мой план в режиме Red Team."
 ];

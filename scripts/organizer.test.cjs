@@ -39,3 +39,24 @@ test('Model context is opt-in, bounded, whitelisted and contains no closed goals
   const withExtra=organizerMessage([{...tasks[0],secret:'EXCLUDED'}]);assert.ok(!withExtra.content.includes('EXCLUDED'));
   assert.throws(()=>organizerMessage(Array(20).fill({...tasks[0],next:'x'.repeat(1000)})),/большой/);
 });
+test('Commands add and update exact task without mutating original state',()=>{
+  const original=O.seed();let state=O.command(original,'Добавь задачу: Протестировать дизайн','design').state;
+  assert.equal(original.tasks.length,4);assert.equal(state.tasks.length,5);
+  state=O.command(state,'Следующий шаг для «Протестировать дизайн»: Открыть на телефоне').state;
+  assert.equal(state.tasks.find(t=>t.id==='design').next,'Открыть на телефоне');
+  state=O.command(state,'Приоритет 1 для «Протестировать дизайн»').state;
+  assert.equal(state.tasks.find(t=>t.id==='design').priority,1);
+  state=O.command(state,'Заверши задачу: Протестировать дизайн').state;
+  assert.equal(state.tasks.find(t=>t.id==='design').status,'done');
+  state=O.command(state,'Возобнови задачу: Протестировать дизайн').state;
+  assert.equal(state.tasks.find(t=>t.id==='design').status,'active');
+});
+test('Ambiguous and unknown commands never silently select a task',()=>{
+  const state=O.seed(),task={...state.tasks[0],id:'duplicate'};
+  assert.throws(()=>O.command(O.upsert(state,task),'Заверши задачу: '+task.title),/несколько/);
+  assert.throws(()=>O.command(state,'Заверши задачу: СВОЯ'),/не найдена/);
+  assert.equal(O.command(state,'Сделай как-нибудь всё').kind,'help');
+  assert.equal(O.command(state,'Покажи архив').filter,'archived');
+  assert.equal(O.command(state,'Что делать сегодня?').kind,'today');
+  assert.throws(()=>O.command(state,'Добавь задачу: '+'x'.repeat(201),'x'));
+});

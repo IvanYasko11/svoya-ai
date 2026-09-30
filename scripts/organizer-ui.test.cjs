@@ -32,3 +32,19 @@ test('UI never overwrites corrupt storage or stale edits',()=>{
   assert.equal(O.load(fresh).tasks[0].id,'income');
   assert.equal(O.load(fresh).tasks.find(t=>t.id==='agent').next,'Changed elsewhere');
 });
+test('Command preview saves only on apply and rejects a stale preview',()=>{
+  const s=storage(),ui=setup(s);
+  ui.$('orgCommand').value='Добавь задачу: Новый дизайн';ui.$('orgCommandForm').onsubmit({preventDefault(){}});
+  assert.equal(s.getItem(O.KEY),null);assert.equal(ui.$('orgProposal').hidden,false);
+  ui.$('orgApply').onclick();assert.ok(O.load(s).tasks.some(t=>t.title==='Новый дизайн'));
+  ui.$('orgCommand').value='Заверши задачу: Новый дизайн';ui.$('orgCommandForm').onsubmit({preventDefault(){}});
+  O.save(s,O.upsert(O.load(s),{...O.load(s).tasks.find(t=>t.id==='new-task'),next:'Изменение из другой вкладки'}));
+  ui.$('orgApply').onclick();assert.equal(O.load(s).tasks.find(t=>t.id==='new-task').status,'active');
+  assert.match(ui.$('organizerMessage').textContent,/Список изменился/);
+});
+test('Search filters titles and next steps without changing stored state',()=>{
+  const s=storage(),ui=setup(s);ui.$('orgSearch').value='окупаемость';ui.$('orgSearch').oninput();
+  assert.equal(ui.$('organizerList').children.length,1);assert.equal(s.getItem(O.KEY),null);
+  ui.$('orgSearch').value='nothingmatches';ui.$('orgSearch').oninput();
+  assert.equal(ui.$('organizerList').children[0].textContent,'В этом списке нет задач.');
+});

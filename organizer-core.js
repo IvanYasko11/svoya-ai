@@ -55,5 +55,26 @@
   function context(state) {
     return state.tasks.filter(t=>['active','waiting'].includes(t.status)).slice(0,20).map(t=>({title:t.title,next:t.next,blocker:t.blocker,status:t.status,priority:t.priority,due:t.due}));
   }
-  return {KEY,STATUSES,validate,seed,load,save,upsert,today,context};
+  function command(state, input, id) {
+    const value=text(input,1500,true);
+    const add=value.match(/^(?:добавь|создай)\s+задачу\s*:\s*([\s\S]+)$/i);
+    if(add) return {kind:'change',label:'Добавить задачу «'+add[1].trim()+'»',state:upsert(state,{id,title:add[1].trim(),next:'',blocker:'',status:'active',priority:2,due:''})};
+    if(/^(?:что делать сегодня|план на сегодня)[?.!]*$/i.test(value))return {kind:'today'};
+    if(/^покажи задачи[.!]*$/i.test(value))return {kind:'list',filter:'open'};
+    if(/^покажи архив[.!]*$/i.test(value))return {kind:'list',filter:'archived'};
+    if(/^помощь[.!]*$/i.test(value))return {kind:'help'};
+    const status=value.match(/^(заверши|отложи|возобнови|архивируй|заблокируй)\s+задачу\s*:\s*(.+)$/i);
+    const step=value.match(/^следующий шаг для\s+«([^»]+)»\s*:\s*([\s\S]+)$/i);
+    const priority=value.match(/^приоритет\s+([123])\s+для\s+«([^»]+)»$/i);
+    const title=status?.[2]||step?.[1]||priority?.[2];
+    if(!title)return {kind:'help'};
+    const found=state.tasks.filter(t=>t.title.toLocaleLowerCase('ru')===title.trim().toLocaleLowerCase('ru'));
+    if(found.length!==1)throw new Error(found.length?'Найдено несколько задач с таким названием. Переименуй нужную карточку.':'Задача не найдена. Используй полное название с карточки.');
+    const task={...found[0]};
+    if(status)task.status={заверши:'done',отложи:'deferred',возобнови:'active',архивируй:'archived',заблокируй:'waiting'}[status[1].toLowerCase()];
+    if(step)task.next=step[2].trim();
+    if(priority)task.priority=Number(priority[1]);
+    return {kind:'change',label:'Обновить задачу «'+task.title+'»'+(status?' → '+status[1].toLowerCase():step?' → новый следующий шаг':' → приоритет '+task.priority),state:upsert(state,task)};
+  }
+  return {KEY,STATUSES,validate,seed,load,save,upsert,today,context,command};
 });
