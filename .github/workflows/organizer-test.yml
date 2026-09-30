@@ -17,7 +17,10 @@ jobs:
           node-version: 22
       - run: node scripts/organizer.test.cjs
       - run: node scripts/organizer-ui.test.cjs
+      - run: node scripts/cloud-backup.test.cjs
+      - run: node scripts/cloud-ui.test.cjs
       - run: node scripts/chat.test.mjs
       - run: node scripts/provider-router.test.cjs
       - run: node --check organizer-ui.js
+      - run: node --check cloud-ui.js
       - run: node --check api/chat.js

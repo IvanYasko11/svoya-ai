@@ -33,6 +33,17 @@
 <div class="org-actions"><button id="orgSave" type="submit">Добавить задачу</button><button id="orgCancel" type="button">Сбросить форму</button></div>
 </form></details>
 <div class="quiet-card"><span class="eyebrow">ТВОЙ ТЕМП</span><h3>Не нужно успевать всё.</h3><p>Сначала одна важная задача. Потом следующая.</p></div></aside></div>
+<details class="backup" id="cloud"><summary>Аккаунт · перенос задач между устройствами</summary>
+<p class="org-note">Сначала список сохраняется в этом браузере. Для переноса войди и нажми «Сохранить в аккаунте». Автоматической синхронизации пока нет. Вход сам по себе не меняет задачи.</p>
+<form id="cloudAuth" class="cloud-auth">
+<label class="org-field">Почта<input id="cloudEmail" type="email" required autocomplete="username" maxlength="254"></label>
+<label class="org-field">Пароль<input id="cloudPassword" type="password" required minlength="8" maxlength="128" autocomplete="current-password"></label>
+<div class="org-actions"><button id="cloudLogin" type="submit" class="primary">Войти</button><button id="cloudSignup" type="button">Создать аккаунт</button></div>
+<p class="org-note">Пароль вводи только здесь. После регистрации подтверди почту. При обновлении страницы потребуется войти снова.</p>
+</form>
+<div id="cloudActions" hidden><p>Аккаунт: <strong id="cloudAccount"></strong></p><div class="org-actions"><button id="cloudCheck" type="button">Проверить копию</button><button id="cloudSave" type="button" class="primary">Сохранить в аккаунте</button><button id="cloudRestore" type="button">Восстановить из аккаунта</button><button id="cloudLogout" type="button">Выйти</button></div></div>
+<p id="cloudMessage" role="status" aria-live="polite"></p>
+</details>
 <details class="backup"><summary>Сохранение и резервная копия</summary><p class="org-note">Список хранится в этом браузере. Очистка данных браузера удалит задачи. Скачай копию для переноса или восстановления.</p><div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
 </details>
 </section>
@@ -67,6 +78,9 @@
 </main>
 <script src="/organizer-core.js"></script>
 <script src="/organizer-ui.js"></script>
+<script src="/cloud-config.js"></script>
+<script src="/cloud-backup.js"></script>
+<script src="/cloud-ui.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let pendingTask="";

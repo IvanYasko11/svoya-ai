@@ -48,3 +48,13 @@ test('Search filters titles and next steps without changing stored state',()=>{
   ui.$('orgSearch').value='nothingmatches';ui.$('orgSearch').oninput();
   assert.equal(ui.$('organizerList').children[0].textContent,'В этом списке нет задач.');
 });
+test('Cloud restore refuses changed local state and resets command previews after success',()=>{
+  const s=storage(),ui=setup(s),snapshot=ui.context.organizerBackup.snapshot();
+  ui.$('orgCommand').value='Добавь задачу: Предложение';ui.$('orgCommandForm').onsubmit({preventDefault(){}});
+  ui.context.organizerBackup.restore({...O.seed(),tasks:[]},snapshot.raw);
+  assert.equal(O.load(s).tasks.length,0);assert.equal(ui.$('orgProposal').hidden,true);
+  ui.$('orgApply').onclick();assert.equal(O.load(s).tasks.length,0);
+  const current=ui.context.organizerBackup.snapshot();O.save(s,O.seed());
+  assert.throws(()=>ui.context.organizerBackup.restore(current.state,current.raw),/задачи изменились/);
+  assert.equal(O.load(s).tasks.length,4);
+});

@@ -111,5 +111,16 @@
     if(storage.getItem(O.KEY)!==raw)throw new Error('Обнови страницу: список задач изменился.');
     return O.context(state);
   };
+  window.organizerBackup={
+    snapshot(){
+      if(!state || storage.getItem(O.KEY)!==raw)throw new Error('Обнови страницу: локальные задачи недоступны или изменились.');
+      return {state:O.validate(state),raw};
+    },
+    restore(incoming,expectedRaw){
+      if(raw!==expectedRaw || storage.getItem(O.KEY)!==expectedRaw)throw new Error('За время загрузки задачи изменились. Повтори восстановление.');
+      if(!commit(O.validate(incoming)))throw new Error('Не удалось сохранить восстановленный список.');
+      proposed=null;$('orgProposal').hidden=true;reset();
+    }
+  };
   render();
 })();
