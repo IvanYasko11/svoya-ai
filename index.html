@@ -16,13 +16,40 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{padding:14px;border:1px solid #26324d;border-radius:12px}.num{font-size:12px;color:#7f8ba5}.risk{margin-top:18px;padding:14px;border-radius:12px;background:#0d1426}.verify{margin-top:12px;padding:14px;border:1px solid #26324d;border-radius:12px}.result{margin-top:18px;white-space:pre-wrap;line-height:1.5}.activity{margin-top:16px;padding:14px;border:1px solid #26324d;border-radius:12px;background:#0d1426;display:none}.activity.active{display:block}.approval{display:none;margin-top:18px;border:1px solid #5b4b20;border-radius:16px;background:linear-gradient(180deg,#1b1a13,#141827);padding:18px}.approval.active{display:block}.approval-title{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}.approval-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#2a2414;border:1px solid #6b5720}.approval-text{margin-top:10px;color:#c6cede;line-height:1.5}.approval-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.approval-box{padding:11px 12px;border-radius:11px;background:#0c1221;border:1px solid #28334c}.approval-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7f8ba5}.approval-value{margin-top:4px;font-weight:700}.approval-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.approve{background:#6ee7b7;color:#07130f}.preview{background:#26324d;color:#eef2ff}.cancel{background:transparent;color:#9aa6c0;border:1px solid #33405f}.approval-note{margin-top:11px;font-size:12px;color:#8995ad}@media(max-width:700px){.approval-meta{grid-template-columns:1fr}}.activity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.spinner{display:inline-block;width:12px;height:12px;border:2px solid #33405f;border-top-color:#6ee7b7;border-radius:50%;animation:spin .8s linear infinite}.timer{font-variant-numeric:tabular-nums;color:#9aa6c0}.progress{height:5px;background:#1a243b;border-radius:999px;overflow:hidden;margin-top:10px}.progress-bar{height:100%;width:0;background:#6ee7b7;transition:width .3s ease}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:700px){.steps{grid-template-columns:1fr}h1{font-size:32px}}
 </style>
+<style>
+.org-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.org-task{padding:14px;margin:10px 0;border:1px solid #33405f;border-radius:12px}.org-task div{color:#9aa6c0;font-size:13px;margin-top:6px}.org-task p{white-space:pre-wrap;overflow-wrap:anywhere}.org-field{display:block;margin-top:12px}.org-field input,.org-field select{width:100%;padding:10px;background:#0b1020;color:#fff;border:1px solid #33405f;border-radius:8px;font:inherit}.org-field textarea{min-height:70px}.org-note{font-size:14px;line-height:1.5;color:#9aa6c0}.org-actions{display:flex;gap:10px;flex-wrap:wrap}#organizerMessage{min-height:24px;color:#6ee7b7;margin-top:12px}@media(max-width:700px){.org-grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 <main class="wrap">
 <div class="top"><div><h1>СВОЯ AI</h1><div class="muted">Личный AI-оператор</div></div><div class="badge">V1.4 • Safe Apply</div></div>
+<section class="card" aria-labelledby="organizerHeading">
+<h2 id="organizerHeading">Мои задачи</h2>
+<p class="org-note">Задачи сохраняются только в этом браузере. Для переноса на другое устройство используй резервную копию. Очистка данных браузера удалит локальный список. Отправка задач модели включается отдельно ниже.</p>
+<h3>Фокус на сегодня · до 3 задач</h3><div id="organizerToday"></div>
+<div class="org-grid"><div>
+<h3>Список задач</h3>
+<label class="org-field">Показать<select id="organizerFilter"><option value="open">Незавершённые</option><option value="active">В работе</option><option value="waiting">Заблокированные</option><option value="deferred">Отложенные</option><option value="done">Готовые</option><option value="archived">Архив</option><option value="all">Все</option></select></label>
+<div id="organizerList"></div>
+</div><div>
+<h3>Задача и следующий шаг</h3>
+<form id="organizerForm">
+<label class="org-field">Цель<input id="orgTitle" required maxlength="200"></label>
+<label class="org-field">Следующий конкретный шаг<textarea id="orgNext" maxlength="1000"></textarea></label>
+<label class="org-field">Что мешает<textarea id="orgBlocker" maxlength="1000"></textarea></label>
+<label class="org-field">Приоритет<select id="orgPriority"><option value="1">1 — главный</option><option value="2">2 — следующий</option><option value="3">3 — позже</option></select></label>
+<label class="org-field">Статус<select id="orgStatus"><option value="active">В работе</option><option value="waiting">Заблокировано</option><option value="deferred">Отложено</option><option value="done">Готово</option><option value="archived">Архив</option></select></label>
+<label class="org-field">Срок, если нужен<input id="orgDue" type="date"></label>
+<div class="org-actions"><button id="orgSave" type="submit">Добавить задачу</button><button id="orgCancel" type="button">Сбросить форму</button></div>
+</form>
+</div></div>
+<div class="org-actions"><button id="orgExport" type="button">Скачать резервную копию</button><label class="org-field">Восстановить из JSON<input id="orgImport" type="file" accept=".json,application/json"></label></div>
+<p id="organizerMessage" role="status" aria-live="polite"></p>
+</section>
 <section class="card">
 <div class="muted">Команда</div>
 <textarea id="task" placeholder=""></textarea>
+<p class="org-note"><label><input id="orgShare" type="checkbox"> Передать модели задачи «В работе» и «Заблокировано» для этого запроса</label><br>Модель предложит план. Статусы и приоритеты списка меняешь ты; ответ модели сам их не перезаписывает.</p>
 <button id="run">Запустить</button>
 <div class="approval" id="approval">
   <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
@@ -48,6 +75,8 @@ button:disabled{opacity:.55;cursor:wait}.status{display:flex;align-items:center;
 <div class="result" id="result"></div>
 </section>
 </main>
+<script src="/organizer-core.js"></script>
+<script src="/organizer-ui.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let pendingTask="";
@@ -130,7 +159,8 @@ $("run").onclick=async()=>{
  try{
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,confirmed:decision==="apply",preview:decision==="preview"})});
+   const organizerContext=window.getOrganizerContext();
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"})});
    const data=await response.json();
 
    if(data?.risk_level){
