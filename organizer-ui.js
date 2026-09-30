@@ -136,6 +136,7 @@
   };
   $('orgDismiss').onclick=()=>{invalidate();message('Изменение отменено.');};
   $('orgStop').onclick=()=>{invalidate();message('Разбор отменён. Задачи не изменены.');};
+  window.addEventListener('svoya:account-changed',()=>{invalidate();message('Аккаунт изменён. Повтори разбор команды после входа.');});
   document.querySelectorAll?.('[data-command]').forEach(b=>{b.onclick=()=>{invalidate();$('orgCommand').value=b.dataset.command;$('orgTarget').value='';$('orgCommand').focus();};});
   $('orgExport').onclick=()=>{
     if(!state){message('Нет доступных задач для экспорта.');return;}

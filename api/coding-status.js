@@ -1,19 +1,30 @@
+import operatorAuth from '../lib/operator-auth.cjs';
+import cloudConfig from '../cloud-config.js';
 export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Cache-Control", "no-store");
 
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const taskId = typeof req.query?.task_id === "string" ? req.query.task_id.trim() : "";
-  if (!taskId) return res.status(400).json({ error: "task_id обязателен." });
+  const user=await operatorAuth.requireOperator(req,res);
+  if(!user)return;
+  const taskId = typeof req.query?.task_id === "string" ? req.query.task_id.trim().toLowerCase() : "";
+  if (!operatorAuth.UUID.test(taskId)) return res.status(400).json({ error: "Нужен корректный task_id." });
 
   const token = process.env.GITHUB_DISPATCH_TOKEN;
   if (!token) return res.status(503).json({ error: "GITHUB_DISPATCH_TOKEN не настроен." });
 
   try {
+    const own=await fetch(cloudConfig.url+'/rest/v1/operator_jobs?task_id=eq.'+encodeURIComponent(taskId)+'&user_id=eq.'+encodeURIComponent(user.id)+'&select=task_id,user_id',{
+      headers:{apikey:cloudConfig.key,Authorization:req.headers.authorization},signal:AbortSignal.timeout(10000)
+    });
+    if(!own.ok)return res.status(503).json({error:'Не удалось проверить владельца задачи.'});
+    const owned=await own.json();
+    if(!Array.isArray(owned)||owned.length!==1||owned[0].task_id!==taskId||owned[0].user_id!==user.id)return res.status(404).json({error:'Задача не найдена в этом аккаунте.'});
     const response = await fetch(
       "https://api.github.com/repos/IvanYasko11/svoya-ai/actions/runs?event=repository_dispatch&per_page=20",
       {
@@ -28,12 +39,12 @@ export default async function handler(req, res) {
 
     const raw = await response.text();
     if (!response.ok) {
-      return res.status(response.status).json({ error: "Не удалось получить статус Coding Agent.", details: raw });
+      return res.status(response.status===429?429:502).json({ error: "Не удалось получить статус Coding Agent.",github_status:response.status });
     }
 
     const data = raw ? JSON.parse(raw) : {};
     const run = (data.workflow_runs || []).find((item) =>
-      String(item.display_title || "").includes(taskId)
+      new RegExp('\\b'+taskId+'\\b','i').test(String(item.display_title || ""))
     );
 
     if (!run) {
@@ -91,7 +102,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     return res.status(500).json({
-      error: `Ошибка проверки Coding Agent: ${error?.message || "неизвестная ошибка"}`
+      error: 'Не удалось проверить Coding Agent. Повтори позже.'
     });
   }
 }

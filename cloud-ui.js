@@ -3,7 +3,10 @@
   const $=id=>document.getElementById(id);
   if(!window.SvoyaCloudConfig||!window.createCloudBackup)return;
   const cloud=window.createCloudBackup({...window.SvoyaCloudConfig,fetch:window.fetch.bind(window),validate:window.SvoyaOrganizer.validate});
-  window.clearOrganizerSession=()=>{stopTimer();cloud.clearSession();autoReady=false;baseline=undefined;render();};
+  let accountEpoch=0;
+  function accountChanged(){accountEpoch++;window.dispatchEvent?.(new Event('svoya:account-changed'));}
+  window.getOrganizerSessionGeneration=()=>accountEpoch;
+  window.clearOrganizerSession=()=>{accountChanged();stopTimer();cloud.clearSession();autoReady=false;baseline=undefined;render();};
   window.getOrganizerAccessToken=()=>{try{return cloud.accessToken();}catch(e){window.clearOrganizerSession();throw e;}};
   const controls=['cloudLogin','cloudSignup','cloudLogout','cloudCheck','cloudSave','cloudRestore','cloudAuto'];
   let busy=false,baseline=undefined,autoReady=false,autoSaving=false,saveTimer=null,localEpoch=0;
@@ -39,8 +42,9 @@
   }
   async function run(action,automatic=false){
     if(busy)return;stopTimer();busy=true;autoSaving=automatic;render();$('cloudMessage').textContent='Подожди…';
+    const initialEpoch=accountEpoch,initiallySigned=cloud.signedIn();
     try{await action();}catch(e){autoReady=false;baseline=undefined;$('cloudMessage').textContent=e.message+' Автосохранение остановлено; задачи остаются в браузере.';}
-    finally{busy=false;autoSaving=false;render();scheduleSave();}
+    finally{if(initiallySigned&&!cloud.signedIn()&&accountEpoch===initialEpoch)accountChanged();busy=false;autoSaving=false;render();scheduleSave();}
   }
   async function check(){
     const copy=await cloud.read();
@@ -49,17 +53,19 @@
     $('cloudMessage').textContent=copy?'В аккаунте '+copy.state.tasks.length+' задач · версия '+copy.revision+'. Выбери, какой список сохранить.':'В аккаунте пока нет копии. Можно сохранить текущие задачи.';
   }
   $('cloudAuth').onsubmit=e=>{e.preventDefault();return run(async()=>{
+    accountChanged();
     const password=$('cloudPassword').value;$('cloudPassword').value='';
     autoReady=false;baseline=undefined;const email=await cloud.login($('cloudEmail').value.trim(),password);$('cloudAccount').textContent=email;await check();
   });};
   $('cloudSignup').onclick=()=>run(async()=>{
     if(!$('cloudAuth').reportValidity())throw new Error('Укажи почту и пароль от 8 символов.');
+    accountChanged();
     const password=$('cloudPassword').value;$('cloudPassword').value='';
     autoReady=false;baseline=undefined;const signed=await cloud.signup($('cloudEmail').value.trim(),password);
     if(signed){$('cloudAccount').textContent=$('cloudEmail').value.trim();await check();}
     else $('cloudMessage').textContent='Если регистрация доступна, письмо подтверждения придёт на почту. Подтверди адрес и вернись сюда, чтобы войти. Задачи пока только в этом браузере.';
   });
-  $('cloudLogout').onclick=()=>run(async()=>{autoReady=false;baseline=undefined;await cloud.logout();$('cloudAccount').textContent='';$('cloudMessage').textContent='Выход выполнен. Локальный список остаётся на этом устройстве. На общем устройстве очисти данные сайта после экспорта.';});
+  $('cloudLogout').onclick=()=>run(async()=>{accountChanged();autoReady=false;baseline=undefined;await cloud.logout();$('cloudAccount').textContent='';$('cloudMessage').textContent='Выход выполнен. Локальный список остаётся на этом устройстве. На общем устройстве очисти данные сайта после экспорта.';});
   $('cloudCheck').onclick=()=>run(check);
   $('cloudSave').onclick=()=>run(async()=>{
     if(!confirm('Сохранить текущий список в аккаунте? Это заменит прежнюю облачную копию.')){$('cloudMessage').textContent='Сохранение отменено.';return;}

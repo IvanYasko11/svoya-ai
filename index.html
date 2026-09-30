@@ -60,6 +60,7 @@
 <textarea id="task" placeholder=""></textarea>
 <p class="org-note"><label><input id="orgShare" type="checkbox"> Учесть мои активные и заблокированные задачи в ответе</label><br>ИИ предложит план. Для изменения списка используй команду организатору выше.</p>
 <button id="run" class="primary">Спросить помощника →</button>
+<p class="org-note">Для ИИ нужен вход в аккаунт владельца. Coding Agent работает с публичным GitHub-проектом: его задания, отчёты и код могут быть видны другим. Личные данные туда не отправляй.</p>
 <div class="approval" id="approval">
   <div class="approval-title"><span class="approval-icon">⚡</span><span>Нужно твоё разрешение</span></div>
   <div class="approval-text" id="approvalText">СВОЯ AI остановилась перед действием, которое может изменить проект.</div>
@@ -96,6 +97,12 @@ let pendingTask="";
 let pendingRoute="";
 let forcedDecision=null;
 let requestGeneration=0;
+let activeChatController=null;
+window.addEventListener?.('svoya:account-changed',()=>{
+ requestGeneration++;activeChatController?.abort();activeChatController=null;
+ pendingTask='';forcedDecision=null;hideApproval();finishActivity();
+ $("run").disabled=false;$("result").textContent='';$("status").textContent='Аккаунт изменён. Отправь запрос после входа.';
+});
 function finishActivity(){ $("activity").classList.remove("active"); }
 
 function hideApproval(){
@@ -167,21 +174,31 @@ $("run").onclick=async()=>{
  
  let agentPending=false;
  const generation=++requestGeneration;
+ const accountGeneration=window.getOrganizerSessionGeneration?.();
+ const controller=new AbortController();activeChatController=controller;
+ let timeout;
  const started=performance.now();
  $("run").disabled=true;$("result").textContent="";hideApproval();$("verify").textContent="выполняется…";$("risk").textContent="проверяется сервером…";$("route").textContent="классифицируется…";
  $("activity").classList.add("active"); $("activityText").textContent="Отправляю запрос…"; $("progressBar").style.width="8%";
- const timerId=setInterval(()=>{$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
+ const timerId=setInterval(()=>{if(generation===requestGeneration)$("timer").textContent=((performance.now()-started)/1000).toFixed(1)+" с"},100);
  const activityId=setInterval(()=>{
    const elapsed=Math.max(0,performance.now()-started);
+   if(generation!==requestGeneration)return;
    $("progressBar").style.width=(8+90*elapsed/(elapsed+45000))+"%";
  },250);
  try{
+   let accessToken;
+   try{accessToken=window.getOrganizerAccessToken?.();if(!accessToken)throw new Error('Войди в аккаунт в разделе «Аккаунт», затем повтори запрос.');}
+   catch(e){$("cloud").open=true;throw e;}
    $("status").textContent=stages[0]; await new Promise(r=>setTimeout(r,250));
    $("status").textContent=stages[1];
    const organizerContext=window.getOrganizerContext();
    $("activityText").textContent="Ожидаю ответ помощника…";
-   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"})});
+   if(generation!==requestGeneration)return;
+   timeout=setTimeout(()=>controller.abort(),120000);
+   const response=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:'Bearer '+accessToken},body:JSON.stringify({task,organizerContext,confirmed:decision==="apply",preview:decision==="preview"}),signal:controller.signal});
    const data=await response.json();
+   if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
    clearInterval(activityId);
 
    if(data?.risk_level){
@@ -189,6 +206,7 @@ $("run").onclick=async()=>{
    }
 
    if(!response.ok){
+     if(response.status===401){window.clearOrganizerSession?.();$("cloud").open=true;$("result").textContent=data?.error||'Сессия закончилась. Войди снова.';return;}
      if(response.status===409 && data?.requires_confirmation){
        showApproval(data,task);
        $("result").textContent="Остановлено перед потенциально опасным действием. Выбери действие выше.";
@@ -212,12 +230,20 @@ $("run").onclick=async()=>{
      $("activityText").textContent="Coding Agent запущен — жду результат…";
      let attempts=0;
      const poll=async()=>{
-       if(generation!==requestGeneration)return;
+       if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
        attempts++;
        try{
-         const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id));
+         let pollToken;
+         try{pollToken=window.getOrganizerAccessToken?.();if(!pollToken)throw new Error('Сессия закончилась. Войди снова.');}
+         catch(e){finishActivity();$("cloud").open=true;$("status").textContent=e.message;return;}
+         const sr=await fetch("/api/coding-status?task_id="+encodeURIComponent(data.task_id),{headers:{Authorization:'Bearer '+pollToken}});
          const sd=await sr.json();
-         if(generation!==requestGeneration)return;
+         if(generation!==requestGeneration||accountGeneration!==window.getOrganizerSessionGeneration?.())return;
+         if(!sr.ok){
+           if(sr.status===401){window.clearOrganizerSession?.();$("cloud").open=true;}
+           if([401,403,404].includes(sr.status)){finishActivity();$("status").textContent=sd.error||'Задача недоступна в этом аккаунте.';return;}
+           throw new Error('Статус временно недоступен.');
+         }
          if(sd.status==="completed"){
            finishActivity();$("activityText").textContent="Coding Agent завершил работу.";
            $("result").textContent+="\n\nСтатус агента: COMPLETED\nRun: "+sd.run_id;
@@ -249,15 +275,17 @@ $("run").onclick=async()=>{
      setTimeout(poll,1500);
    }
  }catch(e){
+   if(generation!==requestGeneration)return;
    $("activityText").textContent="Выполнение остановлено.";
    $("progressBar").style.width="100%";
    $("status").textContent="Ошибка";
    $("verify").textContent="FAIL";
-   $("result").textContent="НЕ ГОТОВО\n\n"+e.message;
+   $("result").textContent="НЕ ГОТОВО\n\n"+(e.name==='AbortError'?'Запрос остановлен по времени. Повтори позже.':e.message);
  }finally{
    clearInterval(timerId);clearInterval(activityId);
-   if(!agentPending)finishActivity();
-   $("run").disabled=false;
+   if(timeout)clearTimeout(timeout);
+   if(activeChatController===controller)activeChatController=null;
+   if(generation===requestGeneration){if(!agentPending)finishActivity();$("run").disabled=false;}
  }
 };
 </script>

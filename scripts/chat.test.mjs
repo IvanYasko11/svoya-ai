@@ -2,15 +2,23 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import handler from '../api/chat.js';
 import health from '../api/llm-health.js';
+const OWNER='11111111-1111-4111-8111-111111111111',SESSION='22222222-2222-4222-8222-222222222222';
+const AUTH={authorization:'Bearer authenticated-owner-token-for-test'};
 
-async function call(method, body) {
+async function call(method, body,{headers=AUTH,userId=OWNER,allowed=true,active=true}={}) {
   const res = {
     headers: {}, code: 200,
     setHeader(name, value) { this.headers[name] = value; },
     status(code) { this.code = code; return this; },
     json(data) { this.data = data; return this; }
   };
-  await handler({ method, body, headers: {} }, res);
+  const currentFetch=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>{
+    if(url.endsWith('/auth/v1/user'))return new Response(JSON.stringify({id:userId,email_confirmed_at:'2026-09-01T00:00:00Z',is_anonymous:false,user_metadata:{owner:true}}),{status:200});
+    if(url.endsWith('/rpc/operator_access_check'))return new Response(JSON.stringify({user_id:userId,session_id:SESSION,active_session:active,allowed}),{status:200});
+    return currentFetch(url,options);
+  };
+  try{await handler({ method, body, headers }, res);}finally{globalThis.fetch=currentFetch;}
   return res;
 }
 
@@ -97,6 +105,6 @@ test('provider rejection reports key error rather than generic outage',async()=>
     for(const key of ['OPENROUTER_API_KEY','GROQ_API_KEY','GEMINI_API_KEY','MISTRAL_API_KEY','SUPABASE_SECRET_KEY','SVOYA_PRIMARY_PROVIDER'])delete process.env[key];
     process.env.OPENROUTER_API_KEY='SECRET_TEST_VALUE';
     globalThis.fetch=async()=>new Response(JSON.stringify({error:{message:'Unauthorized'}}),{status:401});
-    const res=await call('POST',{task:'Привет'});assert.equal(res.code,401);assert.match(res.data.error,/API-ключ/);assert.ok(!JSON.stringify(res.data).includes('SECRET_TEST_VALUE'));
+    const res=await call('POST',{task:'Привет'});assert.equal(res.code,502);assert.match(res.data.error,/API-ключ/);assert.ok(!JSON.stringify(res.data).includes('SECRET_TEST_VALUE'));
   }finally{globalThis.fetch=originalFetch;for(const key of Object.keys(process.env))if(!(key in saved))delete process.env[key];Object.assign(process.env,saved);}
 });

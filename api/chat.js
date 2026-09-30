@@ -7,6 +7,7 @@ const { requestWithFallback } = providerRouter;
 import crypto from "node:crypto";
 import organizerContextModule from "../lib/organizer-context.cjs";
 import providerDiagnosticsModule from "../lib/provider-diagnostics.cjs";
+import operatorAuth from "../lib/operator-auth.cjs";
 
 function classifyRisk(task) {
   const text = task.toLowerCase();
@@ -58,15 +59,15 @@ function hash(value) {
 function getSession(req, res) {
   const cookieHeader = req.headers?.cookie || "";
   const match = cookieHeader.match(/(?:^|;\s*)svoya_session=([^;]+)/);
-  let session = match ? decodeURIComponent(match[1]) : "";
-  if (!session || session.length < 32) {
+  let session = match ? match[1] : "";
+  if (!/^[A-Za-z0-9_-]{32,80}$/.test(session)) {
     session = crypto.randomBytes(32).toString("base64url");
     res.setHeader("Set-Cookie", "svoya_session=" + encodeURIComponent(session) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000");
   }
   return session;
 }
 
-async function createApproval({ task, taskId, session, dbKey }) {
+async function createApproval({ task, taskId, session, dbKey, user }) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hash(token);
   const response = await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals", {
@@ -81,24 +82,26 @@ async function createApproval({ task, taskId, session, dbKey }) {
       task_hash: hash(task),
       task_id: taskId,
       approval_token_hash: tokenHash,
-      session_hash: hash(session)
+      session_hash: hash(user.id+':'+user.sessionId+':'+session),
+      user_id:user.id
     })
   });
   if (!response.ok) throw new Error("Не удалось создать approval.");
   return token;
 }
 
-async function consumeApproval({ task, token, session, dbKey }) {
-  if (!token || !session) return false;
+async function consumeApproval({ task, token, session, dbKey, user }) {
+  if (!/^[A-Za-z0-9_-]{32,80}$/.test(token||'') || !session) return false;
   const tokenHash = hash(token);
-  const sessionHash = hash(session);
+  const sessionHash = hash(user.id+':'+user.sessionId+':'+session);
   const response = await fetch(
     "https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/coding_approvals?approval_token_hash=eq." +
       encodeURIComponent(tokenHash) +
       "&task_hash=eq." + encodeURIComponent(hash(task)) +
       "&session_hash=eq." + encodeURIComponent(sessionHash) +
+      "&user_id=eq."+encodeURIComponent(user.id)+
       "&status=eq.pending&expires_at=gt." + encodeURIComponent(new Date().toISOString()) +
-      "&select=id,task_id&limit=1",
+      "&select=id,task_id",
     {
       method: "PATCH",
       headers: {
@@ -112,15 +115,18 @@ async function consumeApproval({ task, token, session, dbKey }) {
   );
   if (!response.ok) return false;
   const rows = await response.json();
-  return Array.isArray(rows) && rows.length === 1 ? rows[0].task_id : null;
+  return Array.isArray(rows) && rows.length === 1 && operatorAuth.UUID.test(rows[0].task_id||'') ? rows[0].task_id : null;
 }
 
 export default async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Cache-Control", "no-store");
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const user=await operatorAuth.requireOperator(req,res);
+  if(!user)return;
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -150,7 +156,7 @@ export default async function handler(req, res) {
       let approvalToken = null;
       if (isCoding) {
         const taskId = crypto.randomUUID();
-        approvalToken = await createApproval({ task, taskId, session, dbKey });
+        approvalToken = await createApproval({ task, taskId, session, dbKey, user });
         res.setHeader("Set-Cookie", [
           "svoya_session=" + encodeURIComponent(session) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000",
           "svoya_approval=" + encodeURIComponent(approvalToken) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600"
@@ -181,10 +187,10 @@ export default async function handler(req, res) {
         token: (() => {
           const cookieHeader = req.headers?.cookie || "";
           const match = cookieHeader.match(/(?:^|;\s*)svoya_approval=([^;]+)/);
-          return match ? decodeURIComponent(match[1]) : "";
+          return match ? match[1] : "";
         })(),
         session,
-        dbKey
+        dbKey,user
       });
       if (approvedTaskId) {
         res.setHeader("Set-Cookie", "svoya_approval=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
@@ -207,6 +213,18 @@ export default async function handler(req, res) {
 
       const codingModel = process.env.CODING_AGENT_MODEL || "cohere/north-mini-code:free";
       const taskId = codingApply ? approvedTaskId : crypto.randomUUID();
+      if(!dbKey)return res.status(503).json({error:'Coding Agent не запущен: не настроено сохранение владельца задачи.'});
+      // Persist ownership before an external launch. Never launch an untracked job.
+      const ownership=await fetch('https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/operator_jobs',{
+        method:'POST',headers:{apikey:dbKey,Authorization:'Bearer '+dbKey,'Content-Type':'application/json',Prefer:'return=representation'},
+        body:JSON.stringify({task_id:taskId,user_id:user.id,apply_changes:codingApply}),signal:AbortSignal.timeout(10000)
+      });
+      if(!ownership.ok)return res.status(503).json({error:'Coding Agent не запущен: не удалось закрепить владельца задачи.'});
+      const owners=await ownership.json();
+      if(!Array.isArray(owners)||owners.length!==1||owners[0].task_id!==taskId||owners[0].user_id!==user.id)return res.status(503).json({error:'Coding Agent не запущен: владелец задачи не подтверждён.'});
+      const currentUser=await operatorAuth.requireOperator(req,res);
+      if(!currentUser)return;
+      if(currentUser.id!==user.id||currentUser.sessionId!==user.sessionId)return res.status(401).json({error:'Сессия изменилась. Запроси новое подтверждение.'});
 
       const dispatchResponse = await fetch("https://api.github.com/repos/IvanYasko11/svoya-ai/dispatches", {
         method: "POST",
@@ -229,13 +247,9 @@ export default async function handler(req, res) {
       });
 
       if (!dispatchResponse.ok) {
-        const raw = await dispatchResponse.text();
-        let githubMessage = raw;
-        try { githubMessage = (raw ? JSON.parse(raw)?.message : "") || raw; } catch {}
         return res.status(502).json({
           error: "GitHub не принял задачу Coding Agent.",
           github_status: dispatchResponse.status,
-          details: githubMessage,
           hint: dispatchResponse.status === 401
             ? "GITHUB_DISPATCH_TOKEN недействителен или истёк."
             : dispatchResponse.status === 403
@@ -250,7 +264,7 @@ export default async function handler(req, res) {
 
       if (dbKey) {
         try {
-          await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+          const memoryResponse=await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
             method: "POST",
             headers: {
               apikey: dbKey,
@@ -259,6 +273,7 @@ export default async function handler(req, res) {
               Prefer: "return=minimal"
             },
             body: JSON.stringify({
+              user_id:user.id,
               user_request: task,
               intent: routing.intent,
               language: "ru",
@@ -272,8 +287,9 @@ export default async function handler(req, res) {
               verification_status: "queued"
             })
           });
+          if(!memoryResponse.ok)console.warn('SVOYA_HISTORY_SAVE_FAILED',memoryResponse.status);
         } catch (memoryError) {
-          console.error("Database save failed:", memoryError?.message || memoryError);
+          console.warn('SVOYA_HISTORY_SAVE_FAILED');
         }
       }
 
@@ -310,7 +326,8 @@ export default async function handler(req, res) {
 
     if (!providerResult.ok) {
       console.warn('SVOYA_LLM_FAILURE', JSON.stringify({code:providerResult.code,status:providerResult.status,provider:providerResult.provider,attempts:providerResult.attempts?.length||0}));
-      return res.status(providerResult.status).json({
+      const status=providerResult.status===429?429:[503,504].includes(providerResult.status)?providerResult.status:502;
+      return res.status(status).json({
         ...providerDiagnosticsModule.providerDiagnostics(providerResult),
         provider: providerResult.provider,
         model: providerResult.model,
@@ -324,7 +341,7 @@ export default async function handler(req, res) {
 
     if (dbKey) {
       try {
-        await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
+        const memoryResponse=await fetch("https://wmyvdrxsqrntkxurzgps.supabase.co/rest/v1/tasks", {
           method: "POST",
           headers: {
             apikey: dbKey,
@@ -333,6 +350,7 @@ export default async function handler(req, res) {
             Prefer: "return=minimal"
           },
           body: JSON.stringify({
+            user_id:user.id,
             user_request: task,
             intent: routing.intent,
             language: "ru",
@@ -345,8 +363,9 @@ export default async function handler(req, res) {
             verification_status: "pending"
           })
         });
+        if(!memoryResponse.ok)console.warn('SVOYA_HISTORY_SAVE_FAILED',memoryResponse.status);
       } catch (memoryError) {
-        console.error("Database save failed:", memoryError?.message || memoryError);
+        console.warn('SVOYA_HISTORY_SAVE_FAILED');
       }
     }
 
@@ -362,6 +381,6 @@ export default async function handler(req, res) {
       answer
     });
   } catch (error) {
-    return res.status(500).json({ error: "Ошибка соединения с LLM API: " + (error?.message || "неизвестная ошибка") });
+    return res.status(error instanceof SyntaxError?400:502).json({ error: error instanceof SyntaxError?'Некорректный запрос.':'Не удалось выполнить запрос. Повтори позже.' });
   }
 }

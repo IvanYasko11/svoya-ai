@@ -4,11 +4,12 @@ import {createHandler} from '../api/organizer-plan.js';
 import O from '../organizer-core.js';
 const body={command:'поставь главный приоритет цели про агента',state:O.seed(),localDate:'2026-09-30'};
 const auth={authorization:'Bearer authenticated-user-token-for-test'};
+const OWNER='11111111-1111-4111-8111-111111111111',SESSION='22222222-2222-4222-8222-222222222222';
 function response(){return {headers:{},setHeader(k,v){this.headers[k]=v;},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};}
 async function call(handler,payload=body,headers=auth,method='POST'){const res=response();await handler({method,body:payload,headers},res);return res;}
 function setup(options={}){
   const calls=[],models=[];
-  const handler=createHandler({env:{OPENROUTER_API_KEY:'SECRET_KEY'},fetchImpl:async(url,opts)=>{calls.push({url,opts});return new Response(JSON.stringify({id:'owner'}),{status:200});},requestLLM:async(payload)=>{models.push(payload);return {ok:true,provider:'openrouter',model:'openrouter/free',text:JSON.stringify({choices:[{message:{content:JSON.stringify({kind:'proposal',operations:[{type:'update',target:O.seed().tasks[0].title,fields:{priority:2}}]})}}]})};},...options});
+  const handler=createHandler({env:{OPENROUTER_API_KEY:'SECRET_KEY'},fetchImpl:async(url,opts)=>{calls.push({url,opts});return new Response(JSON.stringify(url.endsWith('/auth/v1/user')?{id:OWNER,email_confirmed_at:'2026-09-01T00:00:00Z',is_anonymous:false}:{user_id:OWNER,session_id:SESSION,active_session:true,allowed:true}),{status:200});},requestLLM:async(payload)=>{models.push(payload);return {ok:true,provider:'openrouter',model:'openrouter/free',text:JSON.stringify({choices:[{message:{content:JSON.stringify({kind:'proposal',operations:[{type:'update',target:O.seed().tasks[0].title,fields:{priority:2}}]})}}]})};},...options});
   return {handler,calls,models};
 }
 test('Anonymous or forged sessions never invoke LLM; methods and input are bounded',async()=>{

@@ -89,3 +89,11 @@ test('Command auth expiry or rejection clears the account view and pending autos
   assert.equal(ui.timers.size,0);assert.equal(ui.$('cloudAuth').hidden,false);assert.throws(()=>ui.context.getOrganizerAccessToken(),/Войди снова/);
   assert.equal(ui.context.organizerBackup.snapshot().state.tasks.length,0);
 });
+test('Login, logout, rejected sessions and cloud auth failures invalidate the frontend account generation',async()=>{
+  const ui=setup();assert.equal(ui.context.getOrganizerSessionGeneration(),0);await login(ui);assert.equal(ui.context.getOrganizerSessionGeneration(),1);
+  await ui.$('cloudLogout').onclick();assert.equal(ui.context.getOrganizerSessionGeneration(),2);
+  await login(ui);ui.context.clearOrganizerSession();assert.equal(ui.context.getOrganizerSessionGeneration(),4);
+  await login(ui);const before=ui.context.getOrganizerSessionGeneration();
+  ui.cloud.write=async()=>{ui.cloud.clearSession();throw new Error('Вход истёк');};change(ui,{version:1,tasks:[]});await ui.flush();
+  assert.equal(ui.context.getOrganizerSessionGeneration(),before+1);assert.equal(ui.$('cloudAuth').hidden,false);
+});

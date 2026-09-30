@@ -80,7 +80,7 @@ test('Task selection disambiguates a local command and preserves all other cards
   assert.equal(O.load(s).tasks.find(t=>t.id==='same-title').status,'done');assert.equal(O.load(s).tasks.find(t=>t.id==='agent').status,'active');assert.equal(O.load(s).tasks.length,5);
 });
 test('Late responses after cancellation, command editing, another tab, or a local save cannot produce an applicable proposal',async()=>{
-  for(const action of ['cancel','input','storage','local']){
+  for(const action of ['cancel','input','storage','local','account']){
     const s=storage();let release;
     const ui=setup(s,{getOrganizerAccessToken:()=> 'private-token',fetch:()=>new Promise(r=>release=r)});
     ui.$('orgTarget').value='agent';ui.$('orgCommand').value='заверши эту задачу';
@@ -88,6 +88,7 @@ test('Late responses after cancellation, command editing, another tab, or a loca
     if(action==='cancel')ui.$('orgStop').onclick();
     else if(action==='input'){ui.$('orgCommand').value='другая команда';ui.$('orgCommand').oninput();}
     else if(action==='storage'){O.save(s,O.seed());ui.events.storage({key:O.KEY});}
+    else if(action==='account')ui.events['svoya:account-changed']();
     else{ui.context.organizerBackup.restore({version:1,tasks:[]},null);}
     const expected=s.getItem(O.KEY);release(apiReply(finishSelected));await pending;
     assert.equal(ui.$('orgProposal').hidden,true);assert.equal(ui.$('orgPlanning').hidden,true);ui.$('orgApply').onclick();assert.equal(s.getItem(O.KEY),expected);
