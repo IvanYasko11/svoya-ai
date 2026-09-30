@@ -52,7 +52,11 @@ export function createHandler({fetchImpl=fetch,requestLLM=providerRouter.request
         {role:'system',content:instructions},
         {role:'user',content:JSON.stringify({localDate:date,selectedTask:selectedId?tasks[0]:null,tasks,command})}
       ]},{env,fetchImpl});
-      if(!result.ok)return res.status(result.status>=400?result.status:502).json({...diagnostics.providerDiagnostics(result),provider:result.provider,model:result.model});
+      if(!result.ok){
+        // Upstream key rejection is not rejection of the user's account session.
+        const status=result.status===429?429:[503,504].includes(result.status)?result.status:502;
+        return res.status(status).json({...diagnostics.providerDiagnostics(result),provider:result.provider,model:result.model});
+      }
       let plan;
       try{
         const completion=JSON.parse(result.text),choice=completion?.choices?.[0];

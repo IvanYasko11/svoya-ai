@@ -55,3 +55,8 @@ test('Concurrent commands and repeated bursts are blocked before additional mode
   const burst=setup({now:()=>time});for(let i=0;i<6;i++)assert.equal((await call(burst.handler)).code,200);
   assert.equal((await call(burst.handler)).code,429);time=60001;assert.equal((await call(burst.handler)).code,200);
 });
+test('A provider API-key error is distinct from account expiry and does not ask the client to discard login',async()=>{
+  const x=setup({requestLLM:async()=>({ok:false,status:401,code:'PROVIDER_ERROR',provider:'openrouter',model:'free',text:'SECRET_PROVIDER_KEY'})});
+  const res=await call(x.handler);assert.equal(res.code,502);assert.equal(res.data.upstream_status,401);assert.match(res.data.error,/API-ключ/);
+  assert.ok(!JSON.stringify(res.data).includes('SECRET_PROVIDER_KEY'));
+});
