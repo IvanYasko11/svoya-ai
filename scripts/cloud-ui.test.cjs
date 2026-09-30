@@ -97,3 +97,10 @@ test('Login, logout, rejected sessions and cloud auth failures invalidate the fr
   ui.cloud.write=async()=>{ui.cloud.clearSession();throw new Error('Вход истёк');};change(ui,{version:1,tasks:[]});await ui.flush();
   assert.equal(ui.context.getOrganizerSessionGeneration(),before+1);assert.equal(ui.$('cloudAuth').hidden,false);
 });
+
+test('Missing login preserves request generation; actual token expiry still invalidates the previous account',async()=>{
+  const ui=setup();assert.throws(()=>ui.context.getOrganizerAccessToken(),/Войди снова/);assert.equal(ui.context.getOrganizerSessionGeneration(),0);
+  await login(ui);const before=ui.context.getOrganizerSessionGeneration();
+  ui.cloud.accessToken=()=>{ui.cloud.clearSession();throw new Error('Сессия закончилась');};
+  assert.throws(()=>ui.context.getOrganizerAccessToken(),/Сессия закончилась/);assert.equal(ui.context.getOrganizerSessionGeneration(),before+1);assert.equal(ui.$('cloudAuth').hidden,false);
+});
