@@ -25,6 +25,8 @@ jobs:
       - run: node scripts/operator-auth.test.cjs
       - run: node scripts/chat-auth.test.mjs
       - run: node scripts/coding-status.test.mjs
+      - run: node scripts/app-shell.test.cjs
+      - run: node --check app-shell.js
       - run: node scripts/chat-ui.test.cjs
       - run: node scripts/provider-router.test.cjs
       - run: node --check organizer-ui.js
