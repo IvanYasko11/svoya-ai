@@ -1,0 +1,13 @@
+{
+  "name": "svoya-ai",
+  "version": "1.8.0",
+  "private": true,
+  "description": "Cloud-ready task organizer and AI operator",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node scripts/organizer.test.cjs && node scripts/organizer-ui.test.cjs && node scripts/organizer-proposals.test.cjs && node scripts/organizer-plan.test.mjs && node scripts/cloud-backup.test.cjs && node scripts/cloud-ui.test.cjs && node scripts/chat.test.mjs && node scripts/operator-auth.test.cjs && node scripts/chat-auth.test.mjs && node scripts/coding-status.test.mjs && node scripts/app-shell.test.cjs && node scripts/chat-ui.test.cjs && node scripts/provider-router.test.cjs",
+    "check": "npm test && node --check app-shell.js && node --check organizer-ui.js && node --check cloud-ui.js && node --check api/chat.js && node --check api/coding-status.js && node --check api/organizer-plan.js"
+  }
+}
